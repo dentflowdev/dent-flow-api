@@ -1,0 +1,13 @@
+package com.dentalManagement.dentalFlowBackend;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DentalFlowBackendApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(DentalFlowBackendApplication.class, args);
+	}
+
+}
