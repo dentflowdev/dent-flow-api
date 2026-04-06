@@ -170,24 +170,25 @@ public class OrderExportService {
         // Summary — rows 0 to N (dynamic height)
         int nextRow = writeSummarySection(wb, sheet, orders, byDoctor, startDate, endDate, granularity);
 
-        // Charts begin at row 10 minimum, side by side
-        int chartStart = Math.max(nextRow + 1, 10);
-        int chartEnd   = chartStart + 24;
+        // Pie chart, then bar chart stacked below it
+        int pieStart = Math.max(nextRow + 1, 10);
+        int pieEnd   = pieStart + 22;
+        int barStart = pieEnd + 2;
+        int barEnd   = barStart + 22;
 
         XSSFDrawing drawing = sheet.createDrawingPatriarch();
-        writePieChart(drawing, byDoctor, chartStart, chartEnd);
-        writeBarChart(drawing, orders, granularity, chartStart, chartEnd);
+        writePieChart(drawing, byDoctor, pieStart, pieEnd);
+        writeBarChart(drawing, orders, granularity, barStart, barEnd);
 
-        // Inline doctor table below charts (when doctors > 10 and no separate sheet)
+        // Inline doctor table below both charts (when doctors > 10)
         if (byDoctor.size() > 10) {
-            writeDoctorTable(wb, sheet, byDoctor, chartEnd + 2);
+            writeDoctorTable(wb, sheet, byDoctor, barEnd + 2);
         }
 
-        // Column widths: summary labels | pie area (cols 0-7) | bar area (cols 8-16)
+        // Column widths for charts (cols 0–7) and summary value area
         sheet.setColumnWidth(0, 2  * 256);
         sheet.setColumnWidth(1, 22 * 256);
-        for (int i = 2; i <= 7;  i++) sheet.setColumnWidth(i, 11 * 256);
-        for (int i = 8; i <= 16; i++) sheet.setColumnWidth(i, 10 * 256);
+        for (int i = 2; i <= 7; i++) sheet.setColumnWidth(i, 11 * 256);
     }
 
     // ── Summary section ───────────────────────────────────────────────────
@@ -337,8 +338,8 @@ public class OrderExportService {
         Map<String, Long> grouped = groupByTime(orders, granularity);
         if (grouped.isEmpty()) return;
 
-        // Anchor: cols 8–16 (right half, side-by-side with pie)
-        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 8, startRow, 17, endRow);
+        // Anchor: same width as pie chart (cols 0–8), positioned below it
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 0, startRow, 8, endRow);
         XSSFChart chart = drawing.createChart(anchor);
         chart.setTitleText(barChartTitle(granularity));
         chart.setTitleOverlay(false);
