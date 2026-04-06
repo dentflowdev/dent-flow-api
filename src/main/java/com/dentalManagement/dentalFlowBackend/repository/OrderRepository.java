@@ -55,6 +55,14 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             @Param("lab") Lab lab,
             Pageable pageable);
 
+    // ── Export queries ────────────────────────────────────
+
+    @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :startDate AND :endDate AND o.createdBy.lab.id = :labId ORDER BY o.createdAt ASC")
+    List<Order> findByCreatedAtBetweenAndLabId(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("labId") UUID labId);
+
     // Get stage counts grouped by stage for IN_PROGRESS orders (with stage labels)
     @Query("SELECT o.currentStage as stageName, lws.stageLabel, COUNT(o) as stageCount " +
             "FROM Order o " +
