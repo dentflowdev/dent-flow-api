@@ -107,7 +107,8 @@ public class OrderController {
     public ResponseEntity<OrderResponse> getOrder(@PathVariable UUID orderId) {
 
         log.info("GET /api/orders/{}", orderId);
-        return ResponseEntity.ok(orderService.getOrderById(orderId));
+        OrderResponse response = orderService.getOrderById(orderId);
+        return response != null ? ResponseEntity.ok(response) : ResponseEntity.notFound().build();
     }
 
     // ─────────────────────────────────────────────────────────

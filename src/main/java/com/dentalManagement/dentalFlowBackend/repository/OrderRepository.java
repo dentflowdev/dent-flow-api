@@ -2,6 +2,7 @@ package com.dentalManagement.dentalFlowBackend.repository;
 
 
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
+import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.Order;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,6 +35,24 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Page<Order> findOverdueOrders(
             @Param("statuses") List<OrderStatus> statuses,
             @Param("now") LocalDateTime now,
+            Pageable pageable);
+
+    // ── Lab-filtered queries ──────────────────────────────────
+
+    Page<Order> findAllByCreatedByLab(Lab lab, Pageable pageable);
+
+    Page<Order> findAllByCurrentStatusAndCreatedByLab(OrderStatus status, Lab lab, Pageable pageable);
+
+    Optional<Order> findByBarcodeIdAndCreatedByLab(String barcodeId, Lab lab);
+
+    @Query("SELECT o FROM Order o WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND o.createdBy.lab = :lab")
+    Page<Order> findAllByPatientNameOrDoctorNameContainingIgnoreCaseAndLab(@Param("query") String query, @Param("lab") Lab lab, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.createdBy.lab = :lab")
+    Page<Order> findOverdueOrdersByLab(
+            @Param("statuses") List<OrderStatus> statuses,
+            @Param("now") LocalDateTime now,
+            @Param("lab") Lab lab,
             Pageable pageable);
 
     // Get stage counts grouped by stage for IN_PROGRESS orders (with stage labels)

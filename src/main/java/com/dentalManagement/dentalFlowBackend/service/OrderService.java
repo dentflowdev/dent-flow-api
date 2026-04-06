@@ -11,6 +11,7 @@ import com.dentalManagement.dentalFlowBackend.enums.RoleName;
 import com.dentalManagement.dentalFlowBackend.exception.DuplicateBarcodeException;
 import com.dentalManagement.dentalFlowBackend.exception.InvalidTransitionException;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
+import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.Order;
 import com.dentalManagement.dentalFlowBackend.model.OrderHistory;
 import com.dentalManagement.dentalFlowBackend.model.Role;
@@ -179,6 +180,8 @@ public class OrderService {
         log.info("Updating stage for order {}. Requested stage: {}", orderId, request.getNewStage());
 
         Order order = findOrderById(orderId);
+        User technician = getAuthenticatedUser.execute();
+        validateOrderBelongsToLab(order, technician.getLab());
 
         // Get the workflow to use (provided or default)
         LabWorkflow effectiveWorkflow = order.getWorkflow();
@@ -190,8 +193,6 @@ public class OrderService {
                 request.getNewStage().toString(),
                 effectiveWorkflow
         );
-
-        User technician = getAuthenticatedUser.execute();
 
         // Capture previous state before mutating
         OrderStatus prevStatus = order.getCurrentStatus();
@@ -238,14 +239,14 @@ public class OrderService {
         log.info("Marking order {} as delivered", orderId);
 
         Order order = findOrderById(orderId);
+        User deliveredBy = getAuthenticatedUser.execute();
+        validateOrderBelongsToLab(order, deliveredBy.getLab());
 
         if (order.getCurrentStatus() != OrderStatus.READY) {
             throw new InvalidTransitionException(
                     "Order must be READY to deliver. Current status: " + order.getCurrentStatus()
             );
         }
-
-        User deliveredBy = getAuthenticatedUser.execute();
 
         OrderStatus prevStatus = order.getCurrentStatus();
 
@@ -274,6 +275,11 @@ public class OrderService {
         log.info("Fetching order {}", orderId);
 
         Order order = findOrderById(orderId);
+        User currentUser = getAuthenticatedUser.execute();
+        if (!orderBelongsToLab(order, currentUser.getLab())) {
+            log.info("Order {} does not belong to lab of user {}", orderId, currentUser.getUsername());
+            return null;
+        }
         return orderMapper.toOrderResponseWithWorkflow(order);
     }
 
@@ -286,8 +292,12 @@ public class OrderService {
 
         log.info("Fetching order history for {}", orderId);
 
-        // Verify order exists
-        findOrderById(orderId);
+        Order order = findOrderById(orderId);
+        User currentUser = getAuthenticatedUser.execute();
+        if (!orderBelongsToLab(order, currentUser.getLab())) {
+            log.info("Order {} does not belong to lab of user {} — returning empty history", orderId, currentUser.getUsername());
+            return orderMapper.toOrderHistoryResponse(orderId, List.of());
+        }
 
         // Fetch history - oldest first (as per user requirement)
         List<OrderHistory> historyList = orderHistoryRepository.findAllByOrderIdOrderByChangedAtAsc(orderId);
@@ -304,11 +314,13 @@ public class OrderService {
 
         log.info("Fetching all orders — status: {}, page: {}, size: {}", status, page, size);
 
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getLab();
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         Page<Order> orderPage = status != null
-                ? orderRepository.findAllByCurrentStatus(status, pageable)
-                : orderRepository.findAll(pageable);
+                ? orderRepository.findAllByCurrentStatusAndCreatedByLab(status, currentLab, pageable)
+                : orderRepository.findAllByCreatedByLab(currentLab, pageable);
 
         log.info("Found {} order(s)", orderPage.getTotalElements());
 
@@ -336,10 +348,12 @@ public class OrderService {
 
         log.info("Searching orders with query: '{}', page: {}, size: {}", query, page, size);
 
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getLab();
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        // ── Priority 1: Exact barcode match ──
-        Optional<Order> barcodeMatch = orderRepository.findByBarcodeId(query);
+        // ── Priority 1: Exact barcode match within same lab ──
+        Optional<Order> barcodeMatch = orderRepository.findByBarcodeIdAndCreatedByLab(query, currentLab);
 
         if (barcodeMatch.isPresent()) {
             log.info("Exact barcode match found for query: '{}'", query);
@@ -354,8 +368,8 @@ public class OrderService {
 
         log.info("No barcode match for '{}'. Falling back to patient name search.", query);
 
-        // ── Priority 2 + 3: patient name OR doctor name match ──
-        Page<Order> orderPage = orderRepository.findAllByPatientNameOrDoctorNameContainingIgnoreCase(query, pageable);
+        // ── Priority 2 + 3: patient name OR doctor name match within same lab ──
+        Page<Order> orderPage = orderRepository.findAllByPatientNameOrDoctorNameContainingIgnoreCaseAndLab(query, currentLab, pageable);
 
         log.info("{} match — {} result(s) found for query: '{}'",
                 orderPage.hasContent() ? "Patient name" : "No",
@@ -383,9 +397,9 @@ public class OrderService {
 
         log.info("Deleting order: {}", orderId);
 
-        if (!orderRepository.existsById(orderId)) {
-            throw new ResourceNotFoundException("Order not found: " + orderId);
-        }
+        Order order = findOrderById(orderId);
+        User currentUser = getAuthenticatedUser.execute();
+        validateOrderBelongsToLab(order, currentUser.getLab());
 
         // Delete all history records for this order first (FK constraint)
         int deletedHistoryCount = orderHistoryRepository.deleteAllByOrderId(orderId);
@@ -406,6 +420,8 @@ public class OrderService {
 
         log.info("Fetching overdue orders — page: {}, size: {}", page, size);
 
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getLab();
         Pageable pageable = PageRequest.of(page, size, Sort.by("dueDate").ascending());
 
         List<OrderStatus> activeStatuses = List.of(
@@ -417,8 +433,8 @@ public class OrderService {
         LocalDateTime startOfDayIST = LocalDateTime.now(istZone).toLocalDate().atStartOfDay();
 
         log.info("Comparing overdue orders before: {}", startOfDayIST);
-        Page<Order> orderPage = orderRepository.findOverdueOrders(activeStatuses,
-                startOfDayIST, pageable);
+        Page<Order> orderPage = orderRepository.findOverdueOrdersByLab(activeStatuses,
+                startOfDayIST, currentLab, pageable);
 
         log.info("Found {} overdue order(s)", orderPage.getTotalElements());
 
@@ -460,6 +476,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User updatedBy = getAuthenticatedUser.execute();
+        validateOrderBelongsToLab(order, updatedBy.getLab());
 
         // ── Check if materials are being changed ──
         boolean materialsChanged = request.getMaterials() != null &&
@@ -573,6 +590,17 @@ public class OrderService {
     private Order findOrderById(UUID orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+    }
+
+    private boolean orderBelongsToLab(Order order, Lab userLab) {
+        Lab orderLab = order.getCreatedBy().getLab();
+        return orderLab != null && userLab != null && orderLab.getId().equals(userLab.getId());
+    }
+
+    private void validateOrderBelongsToLab(Order order, Lab userLab) {
+        if (!orderBelongsToLab(order, userLab)) {
+            throw new ResourceNotFoundException("No order found in this lab");
+        }
     }
 
 

@@ -22,7 +22,7 @@ public class AnalyticsController {
 
     @GetMapping("/stages/in-progress")
     public ResponseEntity<List<StageCountDtoResponse>> getInProgressStageCount() {
-        log.info("Request: Get stage counts for IN_PROGRESS orders");
+        log.info("Request: Get stage counts for orders IN_PROGRESS");
         List<StageCountDtoResponse> stageCounts = analyticsService.getStageCountsForInProgress();
         return ResponseEntity.ok(stageCounts);
     }
