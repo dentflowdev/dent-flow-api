@@ -231,19 +231,6 @@ public class OrderExportService {
             case MONTHLY -> "Monthly bars  (range > 1 year)";
         };
 
-        // Doctor summary: list all if ≤ 10, else top 3 + overflow count
-        String doctorSummary = doctorCount <= 10
-                ? byDoctor.entrySet().stream()
-                        .sorted((a, b) -> b.getValue().size() - a.getValue().size())
-                        .map(e -> e.getKey() + " (" + e.getValue().size() + ")")
-                        .collect(Collectors.joining(", "))
-                : byDoctor.entrySet().stream()
-                        .sorted((a, b) -> b.getValue().size() - a.getValue().size())
-                        .limit(3)
-                        .map(e -> e.getKey() + " (" + e.getValue().size() + ")")
-                        .collect(Collectors.joining(", "))
-                        + "   +  " + (doctorCount - 3) + " more";
-
         // Write rows
         int r = 3;
         r = writeSummaryRow(sheet, r, "Total Orders",
@@ -256,8 +243,6 @@ public class OrderExportService {
         r = writeSummaryRow(sheet, r, "Most Active Doctor",
                 mostActive.map(e -> e.getKey() + "  (" + e.getValue().size() + " orders)").orElse("N/A"),
                 labelStyle, valueStyle);
-        r = writeSummaryRow(sheet, r, doctorCount <= 10 ? "All Doctors" : "Top Doctors",
-                doctorSummary, labelStyle, valueStyle);
         r = writeSummaryRow(sheet, r, "Chart Grouping",
                 chartNote, labelStyle, valueStyle);
         if (doctorCount > 20) {
