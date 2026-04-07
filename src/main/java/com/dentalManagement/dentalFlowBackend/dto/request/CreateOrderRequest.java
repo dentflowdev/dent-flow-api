@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 // ─────────────────────────────────────────────────────────────
 // Top-level request — matches exactly what frontend sends
@@ -52,8 +53,8 @@ public class CreateOrderRequest {
 
     @Data
     public static class ClinicalDetails {
-        @NotBlank(message = "Doctor name is required")
-        private String doctor;
+        @NotNull(message = "Doctor ID is required")
+        private UUID doctorId;
 
         private List<String> teeth;
         private List<String> shade;

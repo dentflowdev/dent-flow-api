@@ -75,7 +75,7 @@ public class OrderExportService {
 
             Map<String, List<Order>> byDoctor = orders.stream()
                     .collect(Collectors.groupingBy(
-                            o -> o.getDoctorName() != null ? o.getDoctorName() : "Unknown",
+                            o -> o.getDoctor() != null ? o.getDoctor().getDoctorName() : "Unknown",
                             LinkedHashMap::new,
                             Collectors.toList()
                     ));
@@ -138,7 +138,7 @@ public class OrderExportService {
             setCell(row,  1, o.getCaseNumber(),             base);
             setCell(row,  2, o.getBoxNumber(),              base);
             setCell(row,  3, o.getPatientName(),            base);
-            setCell(row,  4, o.getDoctorName(),             base);
+            setCell(row,  4, o.getDoctor() != null ? o.getDoctor().getDoctorName() : "",  base);
             setCell(row,  5, o.getOrderType(),              base);
             setCell(row,  6, joinList(o.getTeeth()),        wrap);
             setCell(row,  7, joinList(o.getShade()),        wrap);

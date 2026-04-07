@@ -56,8 +56,15 @@ public class OrderResponse {
 
     @Data
     @Builder
+    public static class DoctorInfo {
+        private UUID doctorId;
+        private String doctorName;
+    }
+
+    @Data
+    @Builder
     public static class ClinicalDetails {
-        private String doctor;
+        private DoctorInfo doctor;
         private List<String> teeth;
         private List<String> shade;
         private List<String> materials;

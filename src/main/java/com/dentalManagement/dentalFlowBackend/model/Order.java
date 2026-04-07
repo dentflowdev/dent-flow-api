@@ -49,8 +49,9 @@ public class Order {
     private String patientName;
 
     // ── Clinical Details ──────────────────────────────────────
-    @Column(name = "doctor_name")
-    private String doctorName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "doctor_id")
+    private Doctor doctor;
 
     @Convert(converter = StringListConverter.class)
     @Column(name = "teeth", columnDefinition = "TEXT")

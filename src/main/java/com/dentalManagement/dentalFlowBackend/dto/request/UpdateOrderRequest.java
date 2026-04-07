@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Data
 public class UpdateOrderRequest {
@@ -17,7 +18,7 @@ public class UpdateOrderRequest {
     private String deliverySchedule;
     private String orderType;
     private String patientName;
-    private String doctorName;
+    private UUID doctorId;
     private List<String> teeth;
     private List<String> shade;
     private List<String> materials;

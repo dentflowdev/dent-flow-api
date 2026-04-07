@@ -11,6 +11,7 @@ import com.dentalManagement.dentalFlowBackend.enums.RoleName;
 import com.dentalManagement.dentalFlowBackend.exception.DuplicateBarcodeException;
 import com.dentalManagement.dentalFlowBackend.exception.InvalidTransitionException;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
+import com.dentalManagement.dentalFlowBackend.model.Doctor;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.Order;
 import com.dentalManagement.dentalFlowBackend.model.OrderHistory;
@@ -18,6 +19,7 @@ import com.dentalManagement.dentalFlowBackend.model.Role;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import com.dentalManagement.dentalFlowBackend.model.LabWorkflow;
 import com.dentalManagement.dentalFlowBackend.objectMapper.OrderMapper;
+import com.dentalManagement.dentalFlowBackend.repository.DoctorRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderHistoryRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderRepository;
 import com.dentalManagement.dentalFlowBackend.repository.UserRepository;
@@ -50,6 +52,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderHistoryRepository orderHistoryRepository;
     private final UserRepository userRepository;
+    private final DoctorRepository doctorRepository;
     private final OrderStateMachine stateMachine;
     private final OrderMapper orderMapper;
     private final CloudStorageService cloudStorageService;
@@ -87,7 +90,12 @@ public class OrderService {
             }
         }
 
-        // 4. RESOLVE WORKFLOW from selected materials
+        // 4. Resolve Doctor from doctorId
+        Doctor doctor = doctorRepository.findById(request.getClinicalDetails().getDoctorId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Doctor not found: " + request.getClinicalDetails().getDoctorId()));
+
+        // 5. RESOLVE WORKFLOW from selected materials
         // Get lab from authenticated user (assuming user belongs to a lab)
         UUID labId = createdBy.getPrimaryLab() != null ? createdBy.getPrimaryLab().getId() : null;
         LabWorkflow workflow = null;
@@ -108,7 +116,7 @@ public class OrderService {
         }
         ZoneId istZone = ZoneId.of("Asia/Kolkata");
         LocalDateTime createdAtIST = LocalDateTime.now(istZone);
-        // 5. Map nested request DTO → flat Order entity
+        // 6. Map nested request DTO → flat Order entity
         Order order = Order.builder()
                 .barcodeId(request.getBarcodeId())
                 // Case Details
@@ -120,7 +128,7 @@ public class OrderService {
                 // Patient Details
                 .patientName(request.getPatientDetails().getName())
                 // Clinical Details
-                .doctorName(request.getClinicalDetails().getDoctor())
+                .doctor(doctor)
                 .teeth(request.getClinicalDetails().getTeeth())
                 .shade(request.getClinicalDetails().getShade())
                 .materials(request.getClinicalDetails().getMaterials())
@@ -141,7 +149,7 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // 6. Record first history entry
+        // 7. Record first history entry
         recordHistory(savedOrder, createdBy,
                 null, null,
                 OrderStatus.ORDER_CREATED, null,
@@ -455,7 +463,7 @@ public class OrderService {
     // UPDATE ORDER DETAILS (with workflow change handling)
     //
     // Allowed fields: boxNumber, dueDate, deliverySchedule,
-    //                 orderType, patientName, doctorName,
+    //                 orderType, patientName, doctorId,
     //                 teeth, shade, materials, instructions
     //
     // SPECIAL HANDLING FOR MATERIALS:
@@ -528,7 +536,11 @@ public class OrderService {
         if (request.getDeliverySchedule() != null) order.setDeliverySchedule(request.getDeliverySchedule());
         if (request.getOrderType() != null) order.setOrderType(request.getOrderType());
         if (request.getPatientName() != null) order.setPatientName(request.getPatientName());
-        if (request.getDoctorName() != null) order.setDoctorName(request.getDoctorName());
+        if (request.getDoctorId() != null) {
+            Doctor updatedDoctor = doctorRepository.findById(request.getDoctorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Doctor not found: " + request.getDoctorId()));
+            order.setDoctor(updatedDoctor);
+        }
         if (request.getTeeth() != null) order.setTeeth(request.getTeeth());
         if (request.getShade() != null) order.setShade(request.getShade());
         if (request.getMaterials() != null) order.setMaterials(request.getMaterials());

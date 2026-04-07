@@ -28,7 +28,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByBarcodeId(String barcodeId);
 
     // Combined patient name OR doctor name search
-    @Query("SELECT o FROM Order o WHERE LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))")
+    @Query("SELECT o FROM Order o LEFT JOIN o.doctor d WHERE LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(d.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))")
     Page<Order> findAllByPatientNameOrDoctorNameContainingIgnoreCase(@Param("query") String query, Pageable pageable);
 
     @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now")
@@ -48,7 +48,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o FROM Order o WHERE o.barcodeId = :barcodeId AND :lab MEMBER OF o.createdBy.labs")
     Optional<Order> findByBarcodeIdAndCreatedByLab(@Param("barcodeId") String barcodeId, @Param("lab") Lab lab);
 
-    @Query("SELECT o FROM Order o WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND :lab MEMBER OF o.createdBy.labs")
+    @Query("SELECT o FROM Order o LEFT JOIN o.doctor d WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(d.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND :lab MEMBER OF o.createdBy.labs")
     Page<Order> findAllByPatientNameOrDoctorNameContainingIgnoreCaseAndLab(@Param("query") String query, @Param("lab") Lab lab, Pageable pageable);
 
     @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND :lab MEMBER OF o.createdBy.labs")
