@@ -70,7 +70,7 @@ public class LabService {
                 .firstName(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .lab(lab)
+                .labs(new HashSet<>(Set.of(lab)))
                 .roles(Set.of(adminRole, defaultRole))
                 .isActive(true)
                 .build();
@@ -187,11 +187,11 @@ public class LabService {
                 .orElseThrow(() -> new NoSuchElementException(
                         "Authenticated user not found: " + username));
 
-        if (user.getLab() == null) {
+        if (user.getLabs().isEmpty()) {
             throw new IllegalStateException(
                     "User '" + username + "' is not associated with any lab.");
         }
-        return user.getLab().getId();
+        return user.getPrimaryLab().getId();
     }
 
     private String generateUniqueLabCode() {

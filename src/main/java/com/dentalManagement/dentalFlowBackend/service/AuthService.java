@@ -28,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -90,7 +91,7 @@ public class AuthService {
                 .mobileNumber(request.getMobileNumber())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .roles(Set.of(defaultRole))
-                .lab(labFound)
+                .labs(new HashSet<>(Set.of(labFound)))
                 .build();
 
         User saved = userRepository.save(user);

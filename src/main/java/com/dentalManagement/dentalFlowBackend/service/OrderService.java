@@ -89,7 +89,7 @@ public class OrderService {
 
         // 4. RESOLVE WORKFLOW from selected materials
         // Get lab from authenticated user (assuming user belongs to a lab)
-        UUID labId = createdBy.getLab() != null ? createdBy.getLab().getId() : null;
+        UUID labId = createdBy.getPrimaryLab() != null ? createdBy.getPrimaryLab().getId() : null;
         LabWorkflow workflow = null;
 
         if (labId != null && request.getClinicalDetails().getMaterials() != null) {
@@ -181,7 +181,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User technician = getAuthenticatedUser.execute();
-        validateOrderBelongsToLab(order, technician.getLab());
+        validateOrderBelongsToLab(order, technician.getPrimaryLab());
 
         // Get the workflow to use (provided or default)
         LabWorkflow effectiveWorkflow = order.getWorkflow();
@@ -240,7 +240,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User deliveredBy = getAuthenticatedUser.execute();
-        validateOrderBelongsToLab(order, deliveredBy.getLab());
+        validateOrderBelongsToLab(order, deliveredBy.getPrimaryLab());
 
         if (order.getCurrentStatus() != OrderStatus.READY) {
             throw new InvalidTransitionException(
@@ -276,7 +276,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User currentUser = getAuthenticatedUser.execute();
-        if (!orderBelongsToLab(order, currentUser.getLab())) {
+        if (!orderBelongsToLab(order, currentUser.getPrimaryLab())) {
             log.info("Order {} does not belong to lab of user {}", orderId, currentUser.getUsername());
             return null;
         }
@@ -294,7 +294,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User currentUser = getAuthenticatedUser.execute();
-        if (!orderBelongsToLab(order, currentUser.getLab())) {
+        if (!orderBelongsToLab(order, currentUser.getPrimaryLab())) {
             log.info("Order {} does not belong to lab of user {} — returning empty history", orderId, currentUser.getUsername());
             return orderMapper.toOrderHistoryResponse(orderId, List.of());
         }
@@ -315,7 +315,7 @@ public class OrderService {
         log.info("Fetching all orders — status: {}, page: {}, size: {}", status, page, size);
 
         User currentUser = getAuthenticatedUser.execute();
-        Lab currentLab = currentUser.getLab();
+        Lab currentLab = currentUser.getPrimaryLab();
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         Page<Order> orderPage = status != null
@@ -349,7 +349,7 @@ public class OrderService {
         log.info("Searching orders with query: '{}', page: {}, size: {}", query, page, size);
 
         User currentUser = getAuthenticatedUser.execute();
-        Lab currentLab = currentUser.getLab();
+        Lab currentLab = currentUser.getPrimaryLab();
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         // ── Priority 1: Exact barcode match within same lab ──
@@ -399,7 +399,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User currentUser = getAuthenticatedUser.execute();
-        validateOrderBelongsToLab(order, currentUser.getLab());
+        validateOrderBelongsToLab(order, currentUser.getPrimaryLab());
 
         // Delete all history records for this order first (FK constraint)
         int deletedHistoryCount = orderHistoryRepository.deleteAllByOrderId(orderId);
@@ -421,7 +421,7 @@ public class OrderService {
         log.info("Fetching overdue orders — page: {}, size: {}", page, size);
 
         User currentUser = getAuthenticatedUser.execute();
-        Lab currentLab = currentUser.getLab();
+        Lab currentLab = currentUser.getPrimaryLab();
         Pageable pageable = PageRequest.of(page, size, Sort.by("dueDate").ascending());
 
         List<OrderStatus> activeStatuses = List.of(
@@ -476,7 +476,7 @@ public class OrderService {
 
         Order order = findOrderById(orderId);
         User updatedBy = getAuthenticatedUser.execute();
-        validateOrderBelongsToLab(order, updatedBy.getLab());
+        validateOrderBelongsToLab(order, updatedBy.getPrimaryLab());
 
         // ── Check if materials are being changed ──
         boolean materialsChanged = request.getMaterials() != null &&
@@ -488,8 +488,8 @@ public class OrderService {
             log.info("Materials changed for order {}. Checking for workflow change.", orderId);
 
             // Resolve workflow from the new materials
-            UUID labId = order.getCreatedBy().getLab() != null
-                    ? order.getCreatedBy().getLab().getId()
+            UUID labId = order.getCreatedBy().getPrimaryLab() != null
+                    ? order.getCreatedBy().getPrimaryLab().getId()
                     : null;
 
             if (labId != null) {
@@ -593,7 +593,7 @@ public class OrderService {
     }
 
     private boolean orderBelongsToLab(Order order, Lab userLab) {
-        Lab orderLab = order.getCreatedBy().getLab();
+        Lab orderLab = order.getCreatedBy().getPrimaryLab();
         return orderLab != null && userLab != null && orderLab.getId().equals(userLab.getId());
     }
 

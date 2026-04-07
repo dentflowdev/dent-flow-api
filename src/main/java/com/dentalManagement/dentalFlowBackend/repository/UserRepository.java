@@ -4,6 +4,8 @@ package com.dentalManagement.dentalFlowBackend.repository;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,30 +18,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
     Optional<User> findByEmail(String email);
     Optional<User> findByUsernameIgnoreCase(String username);
+
     // ─────────────────────────────────────────────────────────
-    // NEW METHODS: Filter users by lab
+    // Lab-scoped queries — use JPQL JOIN since labs is @ManyToMany
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * Find all active users belonging to a specific lab
-     * @param lab The lab entity
-     * @return List of active users in that lab
-     */
-    List<User> findByLabAndIsActiveTrue(Lab lab);
+    @Query("SELECT u FROM User u JOIN u.labs l WHERE l = :lab AND u.isActive = true")
+    List<User> findByLabAndIsActiveTrue(@Param("lab") Lab lab);
 
-    /**
-     * Find a user by username within a specific lab
-     * @param username The username to search for
-     * @param lab The lab entity
-     * @return Optional containing the user if found
-     */
-    Optional<User> findByUsernameAndLab(String username, Lab lab);
+    @Query("SELECT u FROM User u JOIN u.labs l WHERE u.username = :username AND l = :lab")
+    Optional<User> findByUsernameAndLab(@Param("username") String username, @Param("lab") Lab lab);
 
-    /**
-     * Find a user by username (case-insensitive) within a specific lab
-     * @param username The username to search for (case-insensitive)
-     * @param lab The lab entity
-     * @return Optional containing the user if found
-     */
-    Optional<User> findByUsernameIgnoreCaseAndLab(String username, Lab lab);
+    @Query("SELECT u FROM User u JOIN u.labs l WHERE LOWER(u.username) = LOWER(:username) AND l = :lab")
+    Optional<User> findByUsernameIgnoreCaseAndLab(@Param("username") String username, @Param("lab") Lab lab);
 }

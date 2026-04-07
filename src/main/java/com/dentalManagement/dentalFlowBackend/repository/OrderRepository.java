@@ -39,16 +39,19 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     // ── Lab-filtered queries ──────────────────────────────────
 
-    Page<Order> findAllByCreatedByLab(Lab lab, Pageable pageable);
+    @Query("SELECT o FROM Order o WHERE :lab MEMBER OF o.createdBy.labs")
+    Page<Order> findAllByCreatedByLab(@Param("lab") Lab lab, Pageable pageable);
 
-    Page<Order> findAllByCurrentStatusAndCreatedByLab(OrderStatus status, Lab lab, Pageable pageable);
+    @Query("SELECT o FROM Order o WHERE o.currentStatus = :status AND :lab MEMBER OF o.createdBy.labs")
+    Page<Order> findAllByCurrentStatusAndCreatedByLab(@Param("status") OrderStatus status, @Param("lab") Lab lab, Pageable pageable);
 
-    Optional<Order> findByBarcodeIdAndCreatedByLab(String barcodeId, Lab lab);
+    @Query("SELECT o FROM Order o WHERE o.barcodeId = :barcodeId AND :lab MEMBER OF o.createdBy.labs")
+    Optional<Order> findByBarcodeIdAndCreatedByLab(@Param("barcodeId") String barcodeId, @Param("lab") Lab lab);
 
-    @Query("SELECT o FROM Order o WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND o.createdBy.lab = :lab")
+    @Query("SELECT o FROM Order o WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND :lab MEMBER OF o.createdBy.labs")
     Page<Order> findAllByPatientNameOrDoctorNameContainingIgnoreCaseAndLab(@Param("query") String query, @Param("lab") Lab lab, Pageable pageable);
 
-    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.createdBy.lab = :lab")
+    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND :lab MEMBER OF o.createdBy.labs")
     Page<Order> findOverdueOrdersByLab(
             @Param("statuses") List<OrderStatus> statuses,
             @Param("now") LocalDateTime now,
@@ -57,7 +60,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     // ── Export queries ────────────────────────────────────
 
-    @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :startDate AND :endDate AND o.createdBy.lab.id = :labId ORDER BY o.createdAt ASC")
+    @Query("SELECT o FROM Order o JOIN o.createdBy.labs l WHERE o.createdAt BETWEEN :startDate AND :endDate AND l.id = :labId ORDER BY o.createdAt ASC")
     List<Order> findByCreatedAtBetweenAndLabId(
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,

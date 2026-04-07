@@ -44,7 +44,7 @@ public class AdminService {
     public List<UserResponse> getAllUsers(){
         // Get the current authenticated admin
         User currentAdmin = getAuthenticatedUser.execute();
-        Lab currentAdminLab = currentAdmin.getLab();
+        Lab currentAdminLab = currentAdmin.getPrimaryLab();
 
         log.info("Fetching all users for lab: {}", currentAdminLab.getId());
 
@@ -65,7 +65,7 @@ public class AdminService {
 
         // Ensure the user belongs to the current admin's lab
         User currentAdmin = getAuthenticatedUser.execute();
-        if (!user.getLab().getId().equals(currentAdmin.getLab().getId())) {
+        if (!user.getPrimaryLab().getId().equals(currentAdmin.getPrimaryLab().getId())) {
             log.warn("Attempt to deactivate user {} from different lab by admin {}", userId, currentAdmin.getId());
             throw new OperationNotPermittedException(
                     "You can only manage users within your own lab."
@@ -93,7 +93,7 @@ public class AdminService {
     public UserResponse getUserByUserName(String username){
         // Get the current authenticated admin
         User currentAdmin = getAuthenticatedUser.execute();
-        Lab currentAdminLab = currentAdmin.getLab();
+        Lab currentAdminLab = currentAdmin.getPrimaryLab();
 
         log.info("Fetching user {} from lab: {}", username, currentAdminLab.getId());
 
@@ -120,7 +120,7 @@ public class AdminService {
 
         // Ensure the user belongs to the current admin's lab
         User currentAdmin = getAuthenticatedUser.execute();
-        if (!user.getLab().getId().equals(currentAdmin.getLab().getId())) {
+        if (!user.getPrimaryLab().getId().equals(currentAdmin.getPrimaryLab().getId())) {
             log.warn("Attempt to delete user {} from different lab by admin {}", userId, currentAdmin.getId());
             throw new OperationNotPermittedException(
                     "You can only manage users within your own lab."
@@ -155,7 +155,7 @@ public class AdminService {
 
         // Ensure the user belongs to the current admin's lab
         User currentAdmin = getAuthenticatedUser.execute();
-        if (!user.getLab().getId().equals(currentAdmin.getLab().getId())) {
+        if (!user.getPrimaryLab().getId().equals(currentAdmin.getPrimaryLab().getId())) {
             log.warn("Attempt to assign role to user {} from different lab by admin {}", userId, currentAdmin.getId());
             throw new OperationNotPermittedException(
                     "You can only manage users within your own lab."
