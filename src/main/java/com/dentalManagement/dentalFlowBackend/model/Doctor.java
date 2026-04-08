@@ -21,6 +21,18 @@ public class Doctor {
     @Column(name = "location", nullable = false)
     private String location;
 
-    @Column(unique = true)
+    // Not unique — multiple labs can independently add the same doctor by email.
+    @Column(name = "email")
     private String email;
+
+    // Which lab added this doctor record.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lab_id", nullable = false)
+    private Lab lab;
+
+    // Linked User account (null until the doctor self-registers on the app).
+    // Once linked, this same User is referenced by all Doctor records sharing the same email.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 }

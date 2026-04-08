@@ -1,16 +1,19 @@
 package com.dentalManagement.dentalFlowBackend.service;
 
 
+import com.dentalManagement.dentalFlowBackend.dto.request.DoctorRegisterRequest;
 import com.dentalManagement.dentalFlowBackend.dto.request.LoginRequest;
 import com.dentalManagement.dentalFlowBackend.dto.request.RegisterRequest;
 import com.dentalManagement.dentalFlowBackend.dto.response.AuthResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.UserResponse;
 import com.dentalManagement.dentalFlowBackend.enums.RoleName;
+import com.dentalManagement.dentalFlowBackend.model.Doctor;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.RefreshToken;
 import com.dentalManagement.dentalFlowBackend.model.Role;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import com.dentalManagement.dentalFlowBackend.objectMapper.ResponseMapper;
+import com.dentalManagement.dentalFlowBackend.repository.DoctorRepository;
 import com.dentalManagement.dentalFlowBackend.repository.LabRepository;
 import com.dentalManagement.dentalFlowBackend.repository.RefreshTokenRepository;
 import com.dentalManagement.dentalFlowBackend.repository.RoleRepository;
@@ -43,6 +46,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final DoctorRepository doctorRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
@@ -97,6 +101,64 @@ public class AuthService {
         User saved = userRepository.save(user);
         log.info("User registered successfully - username: [{}], email: [{}]",
                 saved.getUsername(), saved.getEmail());
+
+        return responseMapper.toUserResponse(saved);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // DOCTOR REGISTRATION
+    //
+    // No labCode — labs are resolved automatically by matching
+    // the email against existing Doctor records.
+    //
+    // Flow:
+    //  1. Create user with ROLE_DEFAULT_USER + ROLE_DOCTOR, no labs yet.
+    //  2. Find all Doctor records with the same email.
+    //  3. For each match: link that Doctor's lab → user.labs,
+    //     and set doctor.user = this user.
+    // ─────────────────────────────────────────────────────────
+    public UserResponse registerDoctor(DoctorRegisterRequest request) {
+
+        if (userRepository.findByUsernameIgnoreCase(request.getUsername()).isPresent()) {
+            throw new RuntimeException("Username already taken");
+        }
+
+        Role defaultRole = roleRepository.findByRoleName(RoleName.ROLE_DEFAULT_USER)
+                .orElseThrow(() -> new RuntimeException("Default role not found"));
+        Role doctorRole = roleRepository.findByRoleName(RoleName.ROLE_DOCTOR)
+                .orElseThrow(() -> new RuntimeException("ROLE_DOCTOR not found"));
+
+        User user = User.builder()
+                .username(request.getUsername())
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .mobileNumber(request.getMobileNumber())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .roles(new HashSet<>(Set.of(defaultRole, doctorRole)))
+                .build();
+
+        // Save user first so it has an ID before linking.
+        user = userRepository.save(user);
+
+        // Find all Doctor records matching this email and link them.
+        List<Doctor> matchingDoctors = doctorRepository.findByEmail(request.getEmail());
+        for (Doctor doctor : matchingDoctors) {
+            Lab lab = doctor.getLab();
+            if (lab != null) {
+                boolean alreadyLinked = user.getLabs().stream()
+                        .anyMatch(l -> l.getId().equals(lab.getId()));
+                if (!alreadyLinked) {
+                    user.getLabs().add(lab);
+                }
+            }
+            doctor.setUser(user);
+            doctorRepository.save(doctor);
+        }
+
+        User saved = userRepository.save(user);
+        log.info("Doctor user registered — username: [{}], labs linked: [{}]",
+                saved.getUsername(), saved.getLabs().size());
 
         return responseMapper.toUserResponse(saved);
     }

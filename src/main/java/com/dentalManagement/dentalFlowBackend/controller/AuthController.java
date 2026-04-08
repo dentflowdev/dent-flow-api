@@ -1,6 +1,7 @@
 package com.dentalManagement.dentalFlowBackend.controller;
 
 
+import com.dentalManagement.dentalFlowBackend.dto.request.DoctorRegisterRequest;
 import com.dentalManagement.dentalFlowBackend.dto.request.LabRegistrationRequest;
 import com.dentalManagement.dentalFlowBackend.dto.request.LoginRequest;
 import com.dentalManagement.dentalFlowBackend.dto.request.RegisterRequest;
@@ -26,6 +27,11 @@ public class AuthController {
     @PostMapping("/user/register")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    }
+
+    @PostMapping("/dentist/register")
+    public ResponseEntity<UserResponse> registerDoctor(@Valid @RequestBody DoctorRegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.registerDoctor(request));
     }
 
     @PostMapping("/login")
