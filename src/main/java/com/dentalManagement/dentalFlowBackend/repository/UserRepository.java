@@ -1,6 +1,7 @@
 package com.dentalManagement.dentalFlowBackend.repository;
 
 
+import com.dentalManagement.dentalFlowBackend.enums.RoleName;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,4 +32,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u JOIN u.labs l WHERE LOWER(u.username) = LOWER(:username) AND l = :lab")
     Optional<User> findByUsernameIgnoreCaseAndLab(@Param("username") String username, @Param("lab") Lab lab);
+
+    // Find a user by email who holds a specific role — used for doctor auto-linking.
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE u.email = :email AND r.roleName = :roleName")
+    Optional<User> findByEmailAndRole(@Param("email") String email, @Param("roleName") RoleName roleName);
 }
