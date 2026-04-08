@@ -23,7 +23,7 @@ public class ResponseMapper {
                         .map(r -> r.getRoleName().name())
                         .collect(Collectors.toSet()))
                 .createdAt(user.getCreatedAt())
-                .labId(user.getLab() != null ? user.getLab().getId().toString() : null)
+                .labId(user.getPrimaryLab() != null ? user.getPrimaryLab().getId().toString() : null)
                 .build();
     }
 

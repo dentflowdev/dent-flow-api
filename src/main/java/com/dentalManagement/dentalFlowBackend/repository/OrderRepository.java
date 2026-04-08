@@ -28,7 +28,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByBarcodeId(String barcodeId);
 
     // Combined patient name OR doctor name search
-    @Query("SELECT o FROM Order o WHERE LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))")
+    @Query("SELECT o FROM Order o LEFT JOIN o.doctor d WHERE LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(d.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))")
     Page<Order> findAllByPatientNameOrDoctorNameContainingIgnoreCase(@Param("query") String query, Pageable pageable);
 
     @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now")
@@ -39,21 +39,32 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     // ── Lab-filtered queries ──────────────────────────────────
 
-    Page<Order> findAllByCreatedByLab(Lab lab, Pageable pageable);
+    @Query("SELECT o FROM Order o WHERE :lab MEMBER OF o.createdBy.labs")
+    Page<Order> findAllByCreatedByLab(@Param("lab") Lab lab, Pageable pageable);
 
-    Page<Order> findAllByCurrentStatusAndCreatedByLab(OrderStatus status, Lab lab, Pageable pageable);
+    @Query("SELECT o FROM Order o WHERE o.currentStatus = :status AND :lab MEMBER OF o.createdBy.labs")
+    Page<Order> findAllByCurrentStatusAndCreatedByLab(@Param("status") OrderStatus status, @Param("lab") Lab lab, Pageable pageable);
 
-    Optional<Order> findByBarcodeIdAndCreatedByLab(String barcodeId, Lab lab);
+    @Query("SELECT o FROM Order o WHERE o.barcodeId = :barcodeId AND :lab MEMBER OF o.createdBy.labs")
+    Optional<Order> findByBarcodeIdAndCreatedByLab(@Param("barcodeId") String barcodeId, @Param("lab") Lab lab);
 
-    @Query("SELECT o FROM Order o WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(o.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND o.createdBy.lab = :lab")
+    @Query("SELECT o FROM Order o LEFT JOIN o.doctor d WHERE (LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(d.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))) AND :lab MEMBER OF o.createdBy.labs")
     Page<Order> findAllByPatientNameOrDoctorNameContainingIgnoreCaseAndLab(@Param("query") String query, @Param("lab") Lab lab, Pageable pageable);
 
-    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.createdBy.lab = :lab")
+    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND :lab MEMBER OF o.createdBy.labs")
     Page<Order> findOverdueOrdersByLab(
             @Param("statuses") List<OrderStatus> statuses,
             @Param("now") LocalDateTime now,
             @Param("lab") Lab lab,
             Pageable pageable);
+
+    // ── Export queries ────────────────────────────────────
+
+    @Query("SELECT o FROM Order o JOIN o.createdBy.labs l WHERE o.createdAt BETWEEN :startDate AND :endDate AND l.id = :labId ORDER BY o.createdAt ASC")
+    List<Order> findByCreatedAtBetweenAndLabId(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("labId") UUID labId);
 
     // Get stage counts grouped by stage for IN_PROGRESS orders (with stage labels)
     @Query("SELECT o.currentStage as stageName, lws.stageLabel, COUNT(o) as stageCount " +

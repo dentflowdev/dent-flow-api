@@ -52,11 +52,24 @@ public class User {
     )
     private Set<Role> roles = new HashSet<>();
 
-    // Every user (including the lab admin) belongs to exactly one lab.
-    // Set during self-registration via labCode lookup.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lab_id", nullable = false)
-    private Lab lab;
+    // Lab users belong to exactly one lab (enforced at service layer).
+    // Doctors can belong to many labs.
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "user_labs",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "lab_id")
+    )
+    private Set<Lab> labs = new HashSet<>();
+
+    /**
+     * Convenience accessor for lab users who are always linked to exactly one lab.
+     * Do NOT use this for doctors — iterate labs instead.
+     */
+    public Lab getPrimaryLab() {
+        return labs.stream().findFirst().orElse(null);
+    }
 
 
     @Column(name = "created_at", updatable = false)

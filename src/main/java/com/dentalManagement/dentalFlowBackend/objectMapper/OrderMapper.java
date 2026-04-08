@@ -39,7 +39,12 @@ public class OrderMapper {
                         .name(order.getPatientName())
                         .build())
                 .clinicalDetails(OrderResponse.ClinicalDetails.builder()
-                        .doctor(order.getDoctorName())
+                        .doctor(order.getDoctor() != null
+                                ? OrderResponse.DoctorInfo.builder()
+                                        .doctorId(order.getDoctor().getId())
+                                        .doctorName(order.getDoctor().getDoctorName())
+                                        .build()
+                                : null)
                         .teeth(order.getTeeth())
                         .shade(order.getShade())
                         .materials(order.getMaterials())
