@@ -21,7 +21,7 @@ public class Doctor {
     @Column(name = "location", nullable = false)
     private String location;
 
-    // Not unique — multiple labs can independently add the same doctor by email.
+
     @Column(name = "email")
     private String email;
 
