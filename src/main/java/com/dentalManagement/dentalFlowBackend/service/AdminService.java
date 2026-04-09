@@ -38,21 +38,29 @@ public class AdminService {
     private final GetAuthenticatedUser getAuthenticatedUser;  // ← NEW: Inject to get current admin
 
     /**
-     * Get all active users belonging to the current admin's lab
-     * @return List of UserResponse objects for users in the same lab
+     * Get all active users belonging to the current admin's lab, excluding ROLE_DOCTOR users.
+     * Doctor-role users are linked to labs externally and are not managed through admin operations.
      */
     public List<UserResponse> getAllUsers(){
-        // Get the current authenticated admin
         User currentAdmin = getAuthenticatedUser.execute();
         Lab currentAdminLab = currentAdmin.getPrimaryLab();
 
         log.info("Fetching all users for lab: {}", currentAdminLab.getId());
 
-        // Filter users by current admin's lab and active status
-        return userRepository.findByLabAndIsActiveTrue(currentAdminLab)
+        return userRepository.findByLabAndIsActiveTrueExcludingRole(currentAdminLab, RoleName.ROLE_DOCTOR)
                 .stream()
                 .map(responseMapper::toUserResponse)
                 .collect(Collectors.toList());
+    }
+
+    private void assertNotDoctor(User user) {
+        boolean isDoctor = user.getRoles().stream()
+                .anyMatch(role -> role.getRoleName() == RoleName.ROLE_DOCTOR);
+        if (isDoctor) {
+            throw new OperationNotPermittedException(
+                    "Operations on doctor-role users are not permitted through this endpoint."
+            );
+        }
     }
 
     /**
@@ -71,6 +79,8 @@ public class AdminService {
                     "You can only manage users within your own lab."
             );
         }
+
+        assertNotDoctor(user);
 
         String userEmail = user.getEmail();
         boolean emailExists = labRepository.existsByEmail(userEmail);
@@ -103,6 +113,7 @@ public class AdminService {
                         "User not found with username: " + username + " in your lab"
                 ));
 
+        assertNotDoctor(user);
         return responseMapper.toUserResponse(user);
     }
 
@@ -126,6 +137,8 @@ public class AdminService {
                     "You can only manage users within your own lab."
             );
         }
+
+        assertNotDoctor(user);
 
         refreshTokenRepository.deleteByUser(user);
         userRepository.deleteById(userId);
@@ -161,6 +174,8 @@ public class AdminService {
                     "You can only manage users within your own lab."
             );
         }
+
+        assertNotDoctor(user);
 
         Role newRole = roleRepository.findByRoleName(request.getRoleName())
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + request.getRoleName()));
