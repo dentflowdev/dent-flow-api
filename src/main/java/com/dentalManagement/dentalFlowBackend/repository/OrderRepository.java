@@ -2,6 +2,7 @@ package com.dentalManagement.dentalFlowBackend.repository;
 
 
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
+import com.dentalManagement.dentalFlowBackend.model.Doctor;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.Order;
 import org.springframework.data.domain.Page;
@@ -57,6 +58,30 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             @Param("now") LocalDateTime now,
             @Param("lab") Lab lab,
             Pageable pageable);
+
+    // ── Dentist-scoped queries (orders linked to doctor user across all labs) ──
+
+    @Query("SELECT o FROM Order o WHERE o.doctor IN :doctors")
+    Page<Order> findAllByDoctorIn(@Param("doctors") List<Doctor> doctors, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.doctor IN :doctors AND o.currentStatus = :status")
+    Page<Order> findAllByDoctorInAndCurrentStatus(@Param("doctors") List<Doctor> doctors, @Param("status") OrderStatus status, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.barcodeId = :barcodeId AND o.doctor IN :doctors")
+    Optional<Order> findByBarcodeIdAndDoctorIn(@Param("barcodeId") String barcodeId, @Param("doctors") List<Doctor> doctors);
+
+    @Query("SELECT o FROM Order o WHERE LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) AND o.doctor IN :doctors")
+    Page<Order> findAllByPatientNameContainingIgnoreCaseAndDoctorIn(@Param("query") String query, @Param("doctors") List<Doctor> doctors, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.doctor IN :doctors")
+    Page<Order> findOverdueOrdersByDoctorIn(@Param("statuses") List<OrderStatus> statuses, @Param("now") LocalDateTime now, @Param("doctors") List<Doctor> doctors, Pageable pageable);
+
+    // Dentist orders scoped to a single lab (single Doctor record)
+    @Query("SELECT o FROM Order o WHERE o.doctor = :doctor")
+    Page<Order> findAllByDoctor(@Param("doctor") Doctor doctor, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.doctor = :doctor AND o.currentStatus = :status")
+    Page<Order> findAllByDoctorAndCurrentStatus(@Param("doctor") Doctor doctor, @Param("status") OrderStatus status, Pageable pageable);
 
     // ── Export queries ────────────────────────────────────
 
