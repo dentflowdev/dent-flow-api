@@ -1,5 +1,6 @@
 package com.dentalManagement.dentalFlowBackend.service;
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistLabResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderListResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderResponse;
@@ -222,6 +223,59 @@ public class DentistService {
                 orderPage.getTotalElements(), labId, currentUser.getUsername());
 
         return toDentistOrderListResponse(orderPage);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET ANALYTICS
+    // Returns counts per status, overdue count, and total
+    // for all orders belonging to this dentist's linked labs.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public DentistAnalyticsResponse getAnalytics() {
+        User currentUser = getAuthenticatedUser.execute();
+        log.info("Fetching analytics for dentist: {}", currentUser.getUsername());
+
+        List<Doctor> doctors = doctorRepository.findByUser(currentUser);
+        if (doctors.isEmpty()) {
+            log.info("Dentist {} has no linked labs — returning zero counts", currentUser.getUsername());
+            return DentistAnalyticsResponse.builder()
+                    .orderCreatedCount(0)
+                    .inProgressCount(0)
+                    .readyCount(0)
+                    .deliveredCount(0)
+                    .overdueCount(0)
+                    .totalOrders(0)
+                    .build();
+        }
+
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDateTime startOfDayIST = LocalDateTime.now(istZone).toLocalDate().atStartOfDay();
+
+        List<OrderStatus> activeStatuses = List.of(
+                OrderStatus.ORDER_CREATED,
+                OrderStatus.IN_PROGRESS,
+                OrderStatus.READY
+        );
+
+        long orderCreatedCount = orderRepository.countByDoctorInAndCurrentStatus(doctors, OrderStatus.ORDER_CREATED);
+        long inProgressCount   = orderRepository.countByDoctorInAndCurrentStatus(doctors, OrderStatus.IN_PROGRESS);
+        long readyCount        = orderRepository.countByDoctorInAndCurrentStatus(doctors, OrderStatus.READY);
+        long deliveredCount    = orderRepository.countByDoctorInAndCurrentStatus(doctors, OrderStatus.DELIVERED);
+        long overdueCount      = orderRepository.countOverdueOrdersByDoctorIn(activeStatuses, startOfDayIST, doctors);
+        long totalOrders       = orderRepository.countByDoctorIn(doctors);
+
+        log.info("Analytics for dentist {}: created={}, inProgress={}, ready={}, delivered={}, overdue={}, total={}",
+                currentUser.getUsername(), orderCreatedCount, inProgressCount, readyCount, deliveredCount, overdueCount, totalOrders);
+
+        return DentistAnalyticsResponse.builder()
+                .orderCreatedCount(orderCreatedCount)
+                .inProgressCount(inProgressCount)
+                .readyCount(readyCount)
+                .deliveredCount(deliveredCount)
+                .overdueCount(overdueCount)
+                .totalOrders(totalOrders)
+                .build();
     }
 
     // ─────────────────────────────────────────────────────────

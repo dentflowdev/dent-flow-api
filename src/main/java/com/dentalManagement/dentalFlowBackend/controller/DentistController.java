@@ -1,5 +1,6 @@
 package com.dentalManagement.dentalFlowBackend.controller;
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistLabResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderListResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderResponse;
@@ -22,6 +23,16 @@ import java.util.UUID;
 public class DentistController {
 
     private final DentistService dentistService;
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/dentist/analytics
+    // Returns order counts by status, overdue count, and total.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/analytics/order/count")
+    public ResponseEntity<DentistAnalyticsResponse> getAnalytics() {
+        log.info("GET /api/v1/dentist/analytics");
+        return ResponseEntity.ok(dentistService.getAnalytics());
+    }
 
     // ─────────────────────────────────────────────────────────
     // GET /api/v1/dentist/labs
