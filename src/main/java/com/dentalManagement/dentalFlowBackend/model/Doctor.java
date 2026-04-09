@@ -20,7 +20,7 @@ public class Doctor {
 
     @Column(name = "location", nullable = false)
     private String location;
-    
+
     @Column(name = "email")
     private String email;
 
