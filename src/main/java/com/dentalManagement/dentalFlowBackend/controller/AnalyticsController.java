@@ -56,14 +56,14 @@ public class AnalyticsController {
     }
 
     // ─────────────────────────────────────────────────────────
-    // GET /api/v1/analytics/doctors/order-count
+    // GET /api/v1/analytics/doctors/leaderboard
     // Returns all doctors in the lab with their order count
     // for the current month (1st of month → today, IST).
     // Sorted high → low. Doctors with 0 orders are excluded.
     // ─────────────────────────────────────────────────────────
-    @GetMapping("/doctors/order-count")
+    @GetMapping("/doctors/leaderboard")
     public ResponseEntity<List<DoctorOrderCountResponse>> getDoctorOrderCountsCurrentMonth() {
-        log.info("GET /api/v1/analytics/doctors/order-count");
+        log.info("GET /api/v1/analytics/doctors/leaderboard");
         return ResponseEntity.ok(analyticsService.getDoctorOrderCountsCurrentMonth());
     }
 
