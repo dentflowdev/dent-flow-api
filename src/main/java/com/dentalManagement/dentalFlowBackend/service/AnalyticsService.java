@@ -2,6 +2,7 @@ package com.dentalManagement.dentalFlowBackend.service;
 
 import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.DoctorOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.StageCountDtoResponse;
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
@@ -123,5 +124,37 @@ public class AnalyticsService {
         }
 
         return result;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET DOCTOR ORDER COUNTS — current month (IST)
+    // All doctors in the lab, with order count from 1st of the
+    // current month up to and including today. Sorted high→low.
+    // Doctors with 0 orders in the period are still included.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DoctorOrderCountResponse> getDoctorOrderCountsCurrentMonth() {
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getPrimaryLab();
+
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(istZone);
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfToday = today.plusDays(1).atStartOfDay(); // exclusive
+
+        log.info("Fetching doctor order counts for lab: {} from {} to {}", currentLab.getId(), startOfMonth.toLocalDate(), today);
+
+        List<Object[]> rows = orderRepository.findOrderCountPerDoctorInPeriod(
+                currentLab.getId(), startOfMonth, endOfToday);
+
+        return rows.stream()
+                .map(row -> DoctorOrderCountResponse.builder()
+                        .doctorName((String) row[0])
+                        .location((String) row[1])
+                        .email((String) row[2])
+                        .orderCount(((Number) row[3]).longValue())
+                        .build())
+                .collect(Collectors.toList());
     }
 }
