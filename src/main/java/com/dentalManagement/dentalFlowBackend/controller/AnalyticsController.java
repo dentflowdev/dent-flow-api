@@ -1,6 +1,7 @@
 package com.dentalManagement.dentalFlowBackend.controller;
 
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.StageCountDtoResponse;
 import com.dentalManagement.dentalFlowBackend.service.AnalyticsService;
@@ -38,6 +39,17 @@ public class AnalyticsController {
     public ResponseEntity<DentistAnalyticsResponse> getOrderSummaryCounts() {
         log.info("GET /api/v1/analytics/orders/summary");
         return ResponseEntity.ok(analyticsService.getOrderSummaryCounts());
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/analytics/orders/daily-count
+    // Returns order counts per day for the last 30 days (IST).
+    // All 30 days are always present; days with no orders have count 0.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/orders/daily-count")
+    public ResponseEntity<List<DailyOrderCountResponse>> getDailyOrderCounts() {
+        log.info("GET /api/v1/analytics/orders/daily-count");
+        return ResponseEntity.ok(analyticsService.getDailyOrderCounts());
     }
 
 

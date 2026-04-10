@@ -1,5 +1,6 @@
 package com.dentalManagement.dentalFlowBackend.service;
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.StageCountDtoResponse;
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
@@ -14,9 +15,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,5 +83,45 @@ public class AnalyticsService {
                 .deliveredCount(delivered)
                 .overdueCount(overdue)
                 .build();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET DAILY ORDER COUNTS — last 30 days (IST, inclusive)
+    // Returns one entry per day. Days with no orders have count 0.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DailyOrderCountResponse> getDailyOrderCounts() {
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getPrimaryLab();
+
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(istZone);
+        LocalDate startDate = today.minusDays(29); // 30 days including today
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = today.plusDays(1).atStartOfDay(); // exclusive upper bound
+
+        log.info("Fetching daily order counts for lab: {} from {} to {}", currentLab.getId(), startDate, today);
+
+        List<Object[]> rows = orderRepository.findDailyOrderCountsByLab(
+                currentLab.getId(), startDateTime, endDateTime);
+
+        Map<LocalDate, Long> countByDate = rows.stream()
+                .collect(Collectors.toMap(
+                        row -> LocalDate.parse(row[0].toString()),
+                        row -> ((Number) row[1]).longValue()
+                ));
+
+        List<DailyOrderCountResponse> result = new ArrayList<>(30);
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = startDate.plusDays(i);
+            result.add(DailyOrderCountResponse.builder()
+                    .date(date)
+                    .count(countByDate.getOrDefault(date, 0L))
+                    .build());
+        }
+
+        return result;
     }
 }
