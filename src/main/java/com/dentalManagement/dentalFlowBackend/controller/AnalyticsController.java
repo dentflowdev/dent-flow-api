@@ -1,6 +1,7 @@
 package com.dentalManagement.dentalFlowBackend.controller;
 
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.StageCountDtoResponse;
 import com.dentalManagement.dentalFlowBackend.service.AnalyticsService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,18 @@ public class AnalyticsController {
         log.info("Request: Get stage counts for orders IN_PROGRESS");
         List<StageCountDtoResponse> stageCounts = analyticsService.getStageCountsForInProgress();
         return ResponseEntity.ok(stageCounts);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/analytics/orders/summary
+    // Returns total orders, per-status counts (ORDER_CREATED,
+    // IN_PROGRESS, READY, DELIVERED), and overdue count
+    // scoped to the authenticated user's primary lab.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/orders/count")
+    public ResponseEntity<DentistAnalyticsResponse> getOrderSummaryCounts() {
+        log.info("GET /api/v1/analytics/orders/summary");
+        return ResponseEntity.ok(analyticsService.getOrderSummaryCounts());
     }
 
 

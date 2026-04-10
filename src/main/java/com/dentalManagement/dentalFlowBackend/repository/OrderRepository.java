@@ -94,6 +94,17 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.doctor IN :doctors")
     long countOverdueOrdersByDoctorIn(@Param("statuses") List<OrderStatus> statuses, @Param("now") LocalDateTime now, @Param("doctors") List<Doctor> doctors);
 
+    // ── Lab analytics count queries ───────────────────────
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE :lab MEMBER OF o.createdBy.labs")
+    long countByLab(@Param("lab") Lab lab);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.currentStatus = :status AND :lab MEMBER OF o.createdBy.labs")
+    long countByStatusAndLab(@Param("status") OrderStatus status, @Param("lab") Lab lab);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND :lab MEMBER OF o.createdBy.labs")
+    long countOverdueOrdersByLab(@Param("statuses") List<OrderStatus> statuses, @Param("now") LocalDateTime now, @Param("lab") Lab lab);
+
     // ── Export queries ────────────────────────────────────
 
     @Query("SELECT o FROM Order o JOIN o.createdBy.labs l WHERE o.createdAt BETWEEN :startDate AND :endDate AND l.id = :labId ORDER BY o.createdAt ASC")
