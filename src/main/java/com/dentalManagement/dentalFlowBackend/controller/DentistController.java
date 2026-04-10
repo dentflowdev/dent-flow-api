@@ -1,5 +1,6 @@
 package com.dentalManagement.dentalFlowBackend.controller;
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistLabResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderListResponse;
@@ -113,5 +114,17 @@ public class DentistController {
     public ResponseEntity<DentistOrderResponse> getOrderById(@PathVariable UUID orderId) {
         log.info("GET /api/v1/dentist/orders/{}", orderId);
         return ResponseEntity.ok(dentistService.getOrderById(orderId));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/dentist/orders/daily-count
+    // Returns order counts per day for the last 30 days (IST).
+    // Counts across all labs the dentist is linked to.
+    // All 30 days present; days with no orders have count 0.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/orders/daily-count")
+    public ResponseEntity<List<DailyOrderCountResponse>> getDailyOrderCounts() {
+        log.info("GET /api/v1/dentist/orders/daily-count");
+        return ResponseEntity.ok(dentistService.getDailyOrderCounts());
     }
 }

@@ -1,5 +1,6 @@
 package com.dentalManagement.dentalFlowBackend.service;
 
+import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistLabResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderListResponse;
@@ -22,9 +23,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -325,5 +329,68 @@ public class DentistService {
                 .totalPages(0)
                 .totalElements(0)
                 .build();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET DAILY ORDER COUNTS — last 30 days (IST, inclusive)
+    // Counts across all labs the dentist is linked to.
+    // Days with no orders have count 0.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DailyOrderCountResponse> getDailyOrderCounts() {
+        User currentUser = getAuthenticatedUser.execute();
+
+        List<Doctor> doctors = doctorRepository.findByUser(currentUser);
+        if (doctors.isEmpty()) {
+            return buildEmptyDailyCounts();
+        }
+
+        List<UUID> doctorIds = doctors.stream()
+                .map(Doctor::getId)
+                .collect(Collectors.toList());
+
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(istZone);
+        LocalDate startDate = today.minusDays(29); // 30 days including today
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = today.plusDays(1).atStartOfDay(); // exclusive upper bound
+
+        log.info("Fetching daily order counts for dentist: {} ({} doctor record(s)) from {} to {}",
+                currentUser.getUsername(), doctorIds.size(), startDate, today);
+
+        List<Object[]> rows = orderRepository.findDailyOrderCountsByDoctorIds(
+                doctorIds, startDateTime, endDateTime);
+
+        Map<LocalDate, Long> countByDate = rows.stream()
+                .collect(Collectors.toMap(
+                        row -> LocalDate.parse(row[0].toString()),
+                        row -> ((Number) row[1]).longValue()
+                ));
+
+        List<DailyOrderCountResponse> result = new ArrayList<>(30);
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = startDate.plusDays(i);
+            result.add(DailyOrderCountResponse.builder()
+                    .date(date)
+                    .count(countByDate.getOrDefault(date, 0L))
+                    .build());
+        }
+
+        return result;
+    }
+
+    private List<DailyOrderCountResponse> buildEmptyDailyCounts() {
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDate startDate = LocalDate.now(istZone).minusDays(29);
+        List<DailyOrderCountResponse> result = new ArrayList<>(30);
+        for (int i = 0; i < 30; i++) {
+            result.add(DailyOrderCountResponse.builder()
+                    .date(startDate.plusDays(i))
+                    .count(0L)
+                    .build());
+        }
+        return result;
     }
 }

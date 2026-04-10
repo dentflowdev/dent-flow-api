@@ -120,6 +120,20 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
+    @Query(value = """
+            SELECT CAST(o.created_at AS DATE) AS order_date, COUNT(o.id) AS order_count
+            FROM orders o
+            WHERE o.doctor_id IN :doctorIds
+              AND o.created_at >= :startDate
+              AND o.created_at < :endDate
+            GROUP BY CAST(o.created_at AS DATE)
+            ORDER BY order_date ASC
+            """, nativeQuery = true)
+    List<Object[]> findDailyOrderCountsByDoctorIds(
+            @Param("doctorIds") List<UUID> doctorIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
     // ── Export queries ────────────────────────────────────
 
     @Query("SELECT o FROM Order o JOIN o.createdBy.labs l WHERE o.createdAt BETWEEN :startDate AND :endDate AND l.id = :labId ORDER BY o.createdAt ASC")
