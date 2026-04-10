@@ -2,11 +2,15 @@ package com.dentalManagement.dentalFlowBackend.service;
 
 import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.DoctorOrderCountResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.LabUserLeaderboardEntry;
+import com.dentalManagement.dentalFlowBackend.dto.response.LabUserLeaderboardResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.StageCountDtoResponse;
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import com.dentalManagement.dentalFlowBackend.objectMapper.ResponseMapper;
+import com.dentalManagement.dentalFlowBackend.repository.OrderHistoryRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderRepository;
 import com.dentalManagement.dentalFlowBackend.util.GetAuthenticatedUser;
 
@@ -19,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,6 +33,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AnalyticsService {
     private final OrderRepository orderRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
     private final ResponseMapper responseMapper;
     private final GetAuthenticatedUser getAuthenticatedUser;
 
@@ -123,5 +129,86 @@ public class AnalyticsService {
         }
 
         return result;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET DOCTOR ORDER COUNTS — current month (IST)
+    // All doctors in the lab, with order count from 1st of the
+    // current month up to and including today. Sorted high→low.
+    // Doctors with 0 orders in the period are still included.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DoctorOrderCountResponse> getDoctorOrderCountsCurrentMonth() {
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getPrimaryLab();
+
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(istZone);
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfToday = today.plusDays(1).atStartOfDay(); // exclusive
+
+        log.info("Fetching doctor order counts for lab: {} from {} to {}", currentLab.getId(), startOfMonth.toLocalDate(), today);
+
+        List<Object[]> rows = orderRepository.findOrderCountPerDoctorInPeriod(
+                currentLab.getId(), startOfMonth, endOfToday);
+
+        return rows.stream()
+                .map(row -> DoctorOrderCountResponse.builder()
+                        .doctorName((String) row[0])
+                        .location((String) row[1])
+                        .email((String) row[2])
+                        .orderCount(((Number) row[3]).longValue())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET LAB USER LEADERBOARD — current month (IST)
+    // For each lab user: counts distinct orders touched and
+    // total stage actions, grouped and returned per role.
+    // Sorted high→low by orderCount within each role group.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<LabUserLeaderboardResponse> getLabUserLeaderboard() {
+        User currentUser = getAuthenticatedUser.execute();
+        Lab currentLab = currentUser.getPrimaryLab();
+
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(istZone);
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfToday = today.plusDays(1).atStartOfDay();
+
+        log.info("Fetching lab user leaderboard for lab: {} from {} to {}",
+                currentLab.getId(), startOfMonth.toLocalDate(), today);
+
+        List<Object[]> rows = orderHistoryRepository.findLabUserLeaderboard(
+                currentLab.getId(), startOfMonth, endOfToday);
+
+        // Group entries by role, preserving DB sort order (order_count DESC within each role)
+        Map<String, List<LabUserLeaderboardEntry>> byRole = new LinkedHashMap<>();
+        for (Object[] row : rows) {
+            String firstName  = (String) row[0];
+            String lastName   = (String) row[1];
+            String role       = (String) row[2];
+            long orderCount   = ((Number) row[3]).longValue();
+            long stageCount   = ((Number) row[4]).longValue();
+
+            byRole.computeIfAbsent(role, r -> new ArrayList<>())
+                    .add(LabUserLeaderboardEntry.builder()
+                            .firstName(firstName)
+                            .lastName(lastName)
+                            .orderCount(orderCount)
+                            .stageCount(stageCount)
+                            .build());
+        }
+
+        return byRole.entrySet().stream()
+                .map(e -> LabUserLeaderboardResponse.builder()
+                        .role(e.getKey())
+                        .leaderboard(e.getValue())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

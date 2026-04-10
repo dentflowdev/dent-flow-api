@@ -3,6 +3,8 @@ package com.dentalManagement.dentalFlowBackend.controller;
 
 import com.dentalManagement.dentalFlowBackend.dto.response.DailyOrderCountResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.DoctorOrderCountResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.LabUserLeaderboardResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.StageCountDtoResponse;
 import com.dentalManagement.dentalFlowBackend.service.AnalyticsService;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,30 @@ public class AnalyticsController {
     public ResponseEntity<List<DailyOrderCountResponse>> getDailyOrderCounts() {
         log.info("GET /api/v1/analytics/orders/daily-count");
         return ResponseEntity.ok(analyticsService.getDailyOrderCounts());
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/analytics/doctors/leaderboard
+    // Returns all doctors in the lab with their order count
+    // for the current month (1st of month → today, IST).
+    // Sorted high → low. Doctors with 0 orders are excluded.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/doctors/leaderboard")
+    public ResponseEntity<List<DoctorOrderCountResponse>> getDoctorOrderCountsCurrentMonth() {
+        log.info("GET /api/v1/analytics/doctors/leaderboard");
+        return ResponseEntity.ok(analyticsService.getDoctorOrderCountsCurrentMonth());
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/analytics/lab-users/leaderboard
+    // For each lab user: distinct orders touched + total stage
+    // actions in current month (IST), grouped by role.
+    // Sorted high→low within each role group.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/lab-users/leaderboard")
+    public ResponseEntity<List<LabUserLeaderboardResponse>> getLabUserLeaderboard() {
+        log.info("GET /api/v1/analytics/lab-users/leaderboard");
+        return ResponseEntity.ok(analyticsService.getLabUserLeaderboard());
     }
 
 
