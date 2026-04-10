@@ -518,7 +518,7 @@ public class OrderService {
                                 newWorkflowId != null ? newWorkflowId : "NULL");
 
                         // ── WORKFLOW CHANGED: Reset progress ──
-                        handleWorkflowChange(order, newWorkflow, updatedBy);
+                        handleWorkflowChange(order, newWorkflow);
                     } else {
                         log.info("Materials changed but workflow remains the same for order {}", orderId);
                     }
@@ -565,17 +565,13 @@ public class OrderService {
     // HELPER: Handle workflow change during order update
     // ─────────────────────────────────────────────────────────
 
-    private void handleWorkflowChange(Order order, LabWorkflow newWorkflow, User changedBy) {
+    private void handleWorkflowChange(Order order, LabWorkflow newWorkflow) {
 
         log.info("Handling workflow change for order {}. " +
                         "Resetting stage/status and clearing history except ORDER_CREATED.",
                 order.getId());
 
-        // Step 1: Capture previous state for history record
-        OrderStatus prevStatus = order.getCurrentStatus();
-        String prevStage = order.getCurrentStage();
-
-        // Step 2: Reset order state to initial
+        // Step 1: Reset order state to initial
         order.setWorkflow(newWorkflow);
         order.setCurrentStatus(OrderStatus.ORDER_CREATED);
         order.setCurrentStage(null);
@@ -583,13 +579,7 @@ public class OrderService {
         // Step 3: Save the order with reset state
         orderRepository.save(order);
 
-        // Step 4: Record the workflow change in history
-        recordHistory(order, changedBy,
-                prevStatus, prevStage,
-                OrderStatus.ORDER_CREATED, null,
-                "Materials changed → Workflow updated. Order progress reset to ORDER_CREATED.");
-
-        // Step 5: Clear all intermediate history (keep only initial ORDER_CREATED entries)
+        // Step 4: Clear all intermediate history (keep only initial ORDER_CREATED entries)
         orderHistoryRepository.deleteAllByOrderIdExceptOrderCreated(order.getId());
 
         log.info("Order {} workflow change completed. History cleaned.", order.getId());
