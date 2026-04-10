@@ -27,6 +27,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT u FROM User u JOIN u.labs l WHERE l = :lab AND u.isActive = true")
     List<User> findByLabAndIsActiveTrue(@Param("lab") Lab lab);
 
+    @Query("SELECT u FROM User u JOIN u.labs l WHERE l = :lab AND u.isActive = true AND NOT EXISTS (SELECT r FROM u.roles r WHERE r.roleName = :excludedRole)")
+    List<User> findByLabAndIsActiveTrueExcludingRole(@Param("lab") Lab lab, @Param("excludedRole") RoleName excludedRole);
+
     @Query("SELECT u FROM User u JOIN u.labs l WHERE u.username = :username AND l = :lab")
     Optional<User> findByUsernameAndLab(@Param("username") String username, @Param("lab") Lab lab);
 

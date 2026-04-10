@@ -2,6 +2,7 @@ package com.dentalManagement.dentalFlowBackend.repository;
 
 
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
+import com.dentalManagement.dentalFlowBackend.model.Doctor;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
 import com.dentalManagement.dentalFlowBackend.model.Order;
 import org.springframework.data.domain.Page;
@@ -57,6 +58,81 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             @Param("now") LocalDateTime now,
             @Param("lab") Lab lab,
             Pageable pageable);
+
+    // ── Dentist-scoped queries (orders linked to doctor user across all labs) ──
+
+    @Query("SELECT o FROM Order o WHERE o.doctor IN :doctors")
+    Page<Order> findAllByDoctorIn(@Param("doctors") List<Doctor> doctors, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.doctor IN :doctors AND o.currentStatus = :status")
+    Page<Order> findAllByDoctorInAndCurrentStatus(@Param("doctors") List<Doctor> doctors, @Param("status") OrderStatus status, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.barcodeId = :barcodeId AND o.doctor IN :doctors")
+    Optional<Order> findByBarcodeIdAndDoctorIn(@Param("barcodeId") String barcodeId, @Param("doctors") List<Doctor> doctors);
+
+    @Query("SELECT o FROM Order o WHERE LOWER(o.patientName) LIKE LOWER(CONCAT('%', :query, '%')) AND o.doctor IN :doctors")
+    Page<Order> findAllByPatientNameContainingIgnoreCaseAndDoctorIn(@Param("query") String query, @Param("doctors") List<Doctor> doctors, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.doctor IN :doctors")
+    Page<Order> findOverdueOrdersByDoctorIn(@Param("statuses") List<OrderStatus> statuses, @Param("now") LocalDateTime now, @Param("doctors") List<Doctor> doctors, Pageable pageable);
+
+    // Dentist orders scoped to a single lab (single Doctor record)
+    @Query("SELECT o FROM Order o WHERE o.doctor = :doctor")
+    Page<Order> findAllByDoctor(@Param("doctor") Doctor doctor, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.doctor = :doctor AND o.currentStatus = :status")
+    Page<Order> findAllByDoctorAndCurrentStatus(@Param("doctor") Doctor doctor, @Param("status") OrderStatus status, Pageable pageable);
+
+    // ── Dentist analytics count queries ──────────────────
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.doctor IN :doctors AND o.currentStatus = :status")
+    long countByDoctorInAndCurrentStatus(@Param("doctors") List<Doctor> doctors, @Param("status") OrderStatus status);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.doctor IN :doctors")
+    long countByDoctorIn(@Param("doctors") List<Doctor> doctors);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND o.doctor IN :doctors")
+    long countOverdueOrdersByDoctorIn(@Param("statuses") List<OrderStatus> statuses, @Param("now") LocalDateTime now, @Param("doctors") List<Doctor> doctors);
+
+    // ── Lab analytics count queries ───────────────────────
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE :lab MEMBER OF o.createdBy.labs")
+    long countByLab(@Param("lab") Lab lab);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.currentStatus = :status AND :lab MEMBER OF o.createdBy.labs")
+    long countByStatusAndLab(@Param("status") OrderStatus status, @Param("lab") Lab lab);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.currentStatus IN :statuses AND o.dueDate < :now AND :lab MEMBER OF o.createdBy.labs")
+    long countOverdueOrdersByLab(@Param("statuses") List<OrderStatus> statuses, @Param("now") LocalDateTime now, @Param("lab") Lab lab);
+
+    @Query(value = """
+            SELECT CAST(o.created_at AS DATE) AS order_date, COUNT(o.id) AS order_count
+            FROM orders o
+            JOIN user_labs ul ON o.created_by = ul.user_id
+            WHERE ul.lab_id = :labId
+              AND o.created_at >= :startDate
+              AND o.created_at < :endDate
+            GROUP BY CAST(o.created_at AS DATE)
+            ORDER BY order_date ASC
+            """, nativeQuery = true)
+    List<Object[]> findDailyOrderCountsByLab(
+            @Param("labId") UUID labId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query(value = """
+            SELECT CAST(o.created_at AS DATE) AS order_date, COUNT(o.id) AS order_count
+            FROM orders o
+            WHERE o.doctor_id IN :doctorIds
+              AND o.created_at >= :startDate
+              AND o.created_at < :endDate
+            GROUP BY CAST(o.created_at AS DATE)
+            ORDER BY order_date ASC
+            """, nativeQuery = true)
+    List<Object[]> findDailyOrderCountsByDoctorIds(
+            @Param("doctorIds") List<UUID> doctorIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 
     // ── Export queries ────────────────────────────────────
 
