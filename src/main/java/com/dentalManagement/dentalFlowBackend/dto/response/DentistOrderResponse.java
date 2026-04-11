@@ -25,6 +25,7 @@ public class DentistOrderResponse {
     private String imageUrl;
     private OrderStatus currentStatus;
     private String currentStage;
+    private String labName;
     private LocalDateTime createdAt;
     private LocalDateTime deliveredAt;
     private boolean isEdited;

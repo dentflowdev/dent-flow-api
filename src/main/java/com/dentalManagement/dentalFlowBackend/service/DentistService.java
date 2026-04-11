@@ -64,6 +64,7 @@ public class DentistService {
                         .pincode(doctor.getLab().getPincode())
                         .mobileNumber(doctor.getLab().getMobileNumber())
                         .email(doctor.getLab().getEmail())
+                        .orderCount(orderRepository.countByDoctorIn(List.of(doctor)))
                         .build())
                 .collect(Collectors.toList());
     }
@@ -302,6 +303,7 @@ public class DentistService {
                 .imageUrl(order.getImageUrl())
                 .currentStatus(order.getCurrentStatus())
                 .currentStage(order.getCurrentStage())
+                .labName(order.getDoctor() != null ? order.getDoctor().getLab().getName() : null)
                 .createdAt(order.getCreatedAt())
                 .deliveredAt(order.getDeliveredAt())
                 .isEdited(order.isEdited())

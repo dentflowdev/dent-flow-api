@@ -45,18 +45,21 @@ public interface OrderHistoryRepository extends JpaRepository<OrderHistory, UUID
             SELECT
                 u.first_name,
                 u.last_name,
-                oh.role_at_time,
+                r.role_name,
                 COUNT(DISTINCT oh.order_id) AS order_count,
                 COUNT(oh.id)                AS stage_count
             FROM order_history oh
-            JOIN orders  o  ON oh.order_id   = o.id
-            JOIN users   u  ON oh.changed_by = u.id
-            JOIN user_labs ul ON o.created_by = ul.user_id
+            JOIN orders    o  ON oh.order_id   = o.id
+            JOIN users     u  ON oh.changed_by = u.id
+            JOIN user_roles ur ON ur.user_id   = u.id
+            JOIN roles      r  ON r.id         = ur.role_id
+            JOIN user_labs ul  ON o.created_by = ul.user_id
             WHERE ul.lab_id      = :labId
               AND oh.changed_at >= :startDate
               AND oh.changed_at  < :endDate
-            GROUP BY u.id, u.first_name, u.last_name, oh.role_at_time
-            ORDER BY oh.role_at_time, order_count DESC
+              AND r.role_name NOT IN ('ROLE_ADMIN', 'ROLE_DEFAULT_USER')
+            GROUP BY u.id, u.first_name, u.last_name, r.role_name
+            ORDER BY r.role_name, order_count DESC
             """, nativeQuery = true)
     List<Object[]> findLabUserLeaderboard(
             @Param("labId") UUID labId,
