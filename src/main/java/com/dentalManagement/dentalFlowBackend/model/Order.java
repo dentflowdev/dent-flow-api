@@ -102,6 +102,13 @@ public class Order {
     private boolean isEdited = false;
 
 
+    // ── Doctor-placed flag ────────────────────────────────────
+    // Null  → not set / unknown
+    // true  → order was requested directly by a doctor
+    // false → order was placed by staff (e.g., marketing executive)
+    @Column(name = "order_placed_by_doctor")
+    private Boolean orderPlacedByDoctor;
+
     // ── Workflow (NEW) ────────────────────────────────────────
     // Links this order to a specific lab workflow.
     // Nullable for backward compatibility with existing orders.

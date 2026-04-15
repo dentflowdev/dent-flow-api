@@ -31,6 +31,7 @@ public class OrderResponse {
     private LocalDateTime createdAt;
     private LocalDateTime deliveredAt;
     private boolean isEdited;
+    private Boolean orderPlacedByDoctor;
 
     // ✅ NEW: Workflow stages included in response
     // Populated only when fetching single order details
