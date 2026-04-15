@@ -78,19 +78,7 @@ public class OrderService {
         // 2. Get authenticated user from JWT
         User createdBy = getAuthenticatedUser.execute();
 
-        // 3. Handle optional image upload
-        String imageUrl = null;
-        if (image != null && !image.isEmpty()) {
-            log.info("Uploading image for order: {}", request.getBarcodeId());
-            try {
-                imageUrl = cloudStorageService.uploadImage(image);
-            } catch (Exception e) {
-                log.error("Image upload failed for order {}: {}", request.getBarcodeId(), e.getMessage());
-                throw new RuntimeException("Image upload failed: " + e.getMessage());
-            }
-        }
-
-        // 4. Resolve Doctor from doctorId
+        // 3. Resolve Doctor from doctorId (moved up — image upload deferred after DB save)
         Doctor doctor = doctorRepository.findById(request.getClinicalDetails().getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Doctor not found: " + request.getClinicalDetails().getDoctorId()));
@@ -116,7 +104,8 @@ public class OrderService {
         }
         ZoneId istZone = ZoneId.of("Asia/Kolkata");
         LocalDateTime createdAtIST = LocalDateTime.now(istZone);
-        // 6. Map nested request DTO → flat Order entity
+
+        // 6. Map nested request DTO → flat Order entity (no imageUrl yet — upload happens after save)
         Order order = Order.builder()
                 .barcodeId(request.getBarcodeId())
                 // Case Details
@@ -135,21 +124,38 @@ public class OrderService {
                 // Additional Details
                 .instructions(request.getAdditionalDetails() != null
                         ? request.getAdditionalDetails().getInstructions() : null)
-                // Image
-                .imageUrl(imageUrl)
+                // Image — set after DB save to avoid orphaned uploads on rollback
+                .imageUrl(null)
                 // Status — always starts at ORDER_CREATED with no stage
                 .currentStatus(OrderStatus.ORDER_CREATED)
                 .currentStage(null)
-                // Workflow (NEW)
+                // Workflow
                 .workflow(workflow)
                 // Audit
                 .createdBy(createdBy)
-                .createdAt(createdAtIST)  // ✅ Explicit IST
+                .createdAt(createdAtIST)
                 .build();
 
+        // 7. Save order to DB first — if this fails, no image is uploaded
         Order savedOrder = orderRepository.save(order);
 
-        // 7. Record first history entry
+        // 8. Upload image only after successful DB save
+        //    If upload fails here, delete the saved order to keep DB + storage consistent
+        if (image != null && !image.isEmpty()) {
+            log.info("Uploading image for order: {}", request.getBarcodeId());
+            try {
+                String imageUrl = cloudStorageService.uploadImage(image);
+                savedOrder.setImageUrl(imageUrl);
+                savedOrder = orderRepository.save(savedOrder);
+            } catch (Exception e) {
+                log.error("Image upload failed for order {}. Rolling back DB record. Error: {}",
+                        request.getBarcodeId(), e.getMessage());
+                orderRepository.deleteById(savedOrder.getId());
+                throw new RuntimeException("Image upload failed: " + e.getMessage());
+            }
+        }
+
+        // 9. Record first history entry
         recordHistory(savedOrder, createdBy,
                 null, null,
                 OrderStatus.ORDER_CREATED, null,
