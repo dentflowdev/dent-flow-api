@@ -29,6 +29,16 @@ public class CreateOrderRequest {
 
     private AdditionalDetails additionalDetails;
 
+    // ── Doctor-placed order fields (all optional) ─────────────
+    // If orderPlacedByDoctor = true:
+    //   - dentistOrderRequestId must be present (the request to convert + delete)
+    //   - imageUrl may be present (use directly, skip multipart upload)
+    private Boolean orderPlacedByDoctor;
+
+    private String imageUrl;
+
+    private UUID dentistOrderRequestId;
+
     // ── Nested DTOs ───────────────────────────────────────────
 
     @Data

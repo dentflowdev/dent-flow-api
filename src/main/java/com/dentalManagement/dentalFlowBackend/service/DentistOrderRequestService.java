@@ -121,6 +121,29 @@ public class DentistOrderRequestService {
     }
 
     // ─────────────────────────────────────────────────────────
+    // GET ALL FOR LAB — Returns all pending requests sent to the
+    // authenticated lab user's primary lab
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DentistOrderRequestResponse> getRequestsForCurrentLab() {
+
+        User labUser = getAuthenticatedUser.execute();
+
+        if (labUser.getPrimaryLab() == null) {
+            throw new ResourceNotFoundException("No primary lab linked to this user");
+        }
+
+        log.info("Fetching dentist order requests for lab: {}", labUser.getPrimaryLab().getId());
+
+        return dentistOrderRequestRepository
+                .findByLab(labUser.getPrimaryLab())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ─────────────────────────────────────────────────────────
     // DELETE — Called when the lab accepts (or cancels) the request
     // ─────────────────────────────────────────────────────────
 

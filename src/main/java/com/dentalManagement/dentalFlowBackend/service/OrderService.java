@@ -19,6 +19,8 @@ import com.dentalManagement.dentalFlowBackend.model.Role;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import com.dentalManagement.dentalFlowBackend.model.LabWorkflow;
 import com.dentalManagement.dentalFlowBackend.objectMapper.OrderMapper;
+import com.dentalManagement.dentalFlowBackend.model.DentistOrderRequest;
+import com.dentalManagement.dentalFlowBackend.repository.DentistOrderRequestRepository;
 import com.dentalManagement.dentalFlowBackend.repository.DoctorRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderHistoryRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderRepository;
@@ -53,6 +55,7 @@ public class OrderService {
     private final OrderHistoryRepository orderHistoryRepository;
     private final UserRepository userRepository;
     private final DoctorRepository doctorRepository;
+    private final DentistOrderRequestRepository dentistOrderRequestRepository;
     private final OrderStateMachine stateMachine;
     private final OrderMapper orderMapper;
     private final CloudStorageService cloudStorageService;
@@ -139,9 +142,16 @@ public class OrderService {
         // 7. Save order to DB first — if this fails, no image is uploaded
         Order savedOrder = orderRepository.save(order);
 
-        // 8. Upload image only after successful DB save
-        //    If upload fails here, delete the saved order to keep DB + storage consistent
-        if (image != null && !image.isEmpty()) {
+        // 8. Image handling — two paths:
+        //    a) Doctor-placed order with pre-uploaded imageUrl → assign directly, no upload
+        //    b) Normal flow with multipart image file → upload to cloud storage
+        boolean doctorPlaced = Boolean.TRUE.equals(request.getOrderPlacedByDoctor());
+
+        if (doctorPlaced && request.getImageUrl() != null) {
+            log.info("Doctor-placed order: assigning pre-uploaded imageUrl for order: {}", request.getBarcodeId());
+            savedOrder.setImageUrl(request.getImageUrl());
+            savedOrder = orderRepository.save(savedOrder);
+        } else if (image != null && !image.isEmpty()) {
             log.info("Uploading image for order: {}", request.getBarcodeId());
             try {
                 String imageUrl = cloudStorageService.uploadImage(image);
@@ -153,6 +163,14 @@ public class OrderService {
                 orderRepository.deleteById(savedOrder.getId());
                 throw new RuntimeException("Image upload failed: " + e.getMessage());
             }
+        }
+
+        // 8b. If this order was converted from a DentistOrderRequest, delete that request
+        if (doctorPlaced && request.getDentistOrderRequestId() != null) {
+            dentistOrderRequestRepository.findById(request.getDentistOrderRequestId())
+                    .ifPresent(dentistOrderRequestRepository::delete);
+            log.info("Deleted DentistOrderRequest {} after converting to order",
+                    request.getDentistOrderRequestId());
         }
 
         // 9. Record first history entry
