@@ -7,6 +7,7 @@ import com.dentalManagement.dentalFlowBackend.dto.response.DentistLabResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderListResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderRequestResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.OrderHistoryResponse;
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
 import com.dentalManagement.dentalFlowBackend.service.DentistOrderRequestService;
 import com.dentalManagement.dentalFlowBackend.service.DentistService;
@@ -129,6 +130,17 @@ public class DentistController {
     public ResponseEntity<DentistOrderResponse> getOrderById(@PathVariable UUID orderId) {
         log.info("GET /api/v1/dentist/orders/{}", orderId);
         return ResponseEntity.ok(dentistService.getOrderById(orderId));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/v1/dentist/orders/{orderId}/history
+    // Returns the full audit trail for an order.
+    // Order must belong to this dentist.
+    // ─────────────────────────────────────────────────────────
+    @GetMapping("/orders/{orderId}/history")
+    public ResponseEntity<OrderHistoryResponse> getOrderHistory(@PathVariable UUID orderId) {
+        log.info("GET /api/v1/dentist/orders/{}/history", orderId);
+        return ResponseEntity.ok(dentistService.getOrderHistory(orderId));
     }
 
     // ─────────────────────────────────────────────────────────
