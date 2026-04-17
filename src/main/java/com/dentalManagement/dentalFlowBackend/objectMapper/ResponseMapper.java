@@ -7,6 +7,8 @@ import com.dentalManagement.dentalFlowBackend.model.User;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
@@ -23,7 +25,9 @@ public class ResponseMapper {
                         .map(r -> r.getRoleName().name())
                         .collect(Collectors.toSet()))
                 .createdAt(user.getCreatedAt())
-                .labId(user.getPrimaryLab() != null ? user.getPrimaryLab().getId().toString() : null)
+                .labIds(user.getLabs().stream()
+                        .map(lab -> lab.getId())
+                        .collect(Collectors.toSet()))
                 .build();
     }
 

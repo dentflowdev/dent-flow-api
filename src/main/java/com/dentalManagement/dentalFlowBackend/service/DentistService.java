@@ -5,13 +5,17 @@ import com.dentalManagement.dentalFlowBackend.dto.response.DentistAnalyticsRespo
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistLabResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderListResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderResponse;
+import com.dentalManagement.dentalFlowBackend.dto.response.OrderHistoryResponse;
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
 import com.dentalManagement.dentalFlowBackend.exception.OperationNotPermittedException;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
 import com.dentalManagement.dentalFlowBackend.model.Doctor;
 import com.dentalManagement.dentalFlowBackend.model.Order;
+import com.dentalManagement.dentalFlowBackend.model.OrderHistory;
 import com.dentalManagement.dentalFlowBackend.model.User;
+import com.dentalManagement.dentalFlowBackend.objectMapper.OrderMapper;
 import com.dentalManagement.dentalFlowBackend.repository.DoctorRepository;
+import com.dentalManagement.dentalFlowBackend.repository.OrderHistoryRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderRepository;
 import com.dentalManagement.dentalFlowBackend.util.GetAuthenticatedUser;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +45,8 @@ public class DentistService {
 
     private final DoctorRepository doctorRepository;
     private final OrderRepository orderRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
+    private final OrderMapper orderMapper;
     private final GetAuthenticatedUser getAuthenticatedUser;
 
     // ─────────────────────────────────────────────────────────
@@ -64,6 +70,7 @@ public class DentistService {
                         .pincode(doctor.getLab().getPincode())
                         .mobileNumber(doctor.getLab().getMobileNumber())
                         .email(doctor.getLab().getEmail())
+                        .orderCount(orderRepository.countByDoctorIn(List.of(doctor)))
                         .build())
                 .collect(Collectors.toList());
     }
@@ -161,6 +168,35 @@ public class DentistService {
         }
 
         return toDentistOrderResponse(order);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET ORDER HISTORY
+    // Returns the full audit trail for an order, verifying the
+    // order belongs to this dentist before returning.
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public OrderHistoryResponse getOrderHistory(UUID orderId) {
+        User currentUser = getAuthenticatedUser.execute();
+        log.info("Fetching order history for order {} — dentist: {}", orderId, currentUser.getUsername());
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+
+        List<Doctor> doctors = doctorRepository.findByUser(currentUser);
+        Set<UUID> doctorIds = doctors.stream().map(Doctor::getId).collect(Collectors.toSet());
+
+        if (order.getDoctor() == null || !doctorIds.contains(order.getDoctor().getId())) {
+            log.warn("Dentist {} attempted to access history of order {} which does not belong to them",
+                    currentUser.getUsername(), orderId);
+            throw new OperationNotPermittedException("This order does not belong to you.");
+        }
+
+        List<OrderHistory> historyList =
+                orderHistoryRepository.findAllByOrderIdOrderByChangedAtAsc(orderId);
+
+        return orderMapper.toOrderHistoryResponse(orderId, historyList);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -302,6 +338,7 @@ public class DentistService {
                 .imageUrl(order.getImageUrl())
                 .currentStatus(order.getCurrentStatus())
                 .currentStage(order.getCurrentStage())
+                .labName(order.getDoctor() != null ? order.getDoctor().getLab().getName() : null)
                 .createdAt(order.getCreatedAt())
                 .deliveredAt(order.getDeliveredAt())
                 .isEdited(order.isEdited())

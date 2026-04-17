@@ -19,6 +19,8 @@ import com.dentalManagement.dentalFlowBackend.model.Role;
 import com.dentalManagement.dentalFlowBackend.model.User;
 import com.dentalManagement.dentalFlowBackend.model.LabWorkflow;
 import com.dentalManagement.dentalFlowBackend.objectMapper.OrderMapper;
+import com.dentalManagement.dentalFlowBackend.model.DentistOrderRequest;
+import com.dentalManagement.dentalFlowBackend.repository.DentistOrderRequestRepository;
 import com.dentalManagement.dentalFlowBackend.repository.DoctorRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderHistoryRepository;
 import com.dentalManagement.dentalFlowBackend.repository.OrderRepository;
@@ -53,6 +55,7 @@ public class OrderService {
     private final OrderHistoryRepository orderHistoryRepository;
     private final UserRepository userRepository;
     private final DoctorRepository doctorRepository;
+    private final DentistOrderRequestRepository dentistOrderRequestRepository;
     private final OrderStateMachine stateMachine;
     private final OrderMapper orderMapper;
     private final CloudStorageService cloudStorageService;
@@ -78,19 +81,7 @@ public class OrderService {
         // 2. Get authenticated user from JWT
         User createdBy = getAuthenticatedUser.execute();
 
-        // 3. Handle optional image upload
-        String imageUrl = null;
-        if (image != null && !image.isEmpty()) {
-            log.info("Uploading image for order: {}", request.getBarcodeId());
-            try {
-                imageUrl = cloudStorageService.uploadImage(image);
-            } catch (Exception e) {
-                log.error("Image upload failed for order {}: {}", request.getBarcodeId(), e.getMessage());
-                throw new RuntimeException("Image upload failed: " + e.getMessage());
-            }
-        }
-
-        // 4. Resolve Doctor from doctorId
+        // 3. Resolve Doctor from doctorId (moved up — image upload deferred after DB save)
         Doctor doctor = doctorRepository.findById(request.getClinicalDetails().getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Doctor not found: " + request.getClinicalDetails().getDoctorId()));
@@ -116,7 +107,8 @@ public class OrderService {
         }
         ZoneId istZone = ZoneId.of("Asia/Kolkata");
         LocalDateTime createdAtIST = LocalDateTime.now(istZone);
-        // 6. Map nested request DTO → flat Order entity
+
+        // 6. Map nested request DTO → flat Order entity (no imageUrl yet — upload happens after save)
         Order order = Order.builder()
                 .barcodeId(request.getBarcodeId())
                 // Case Details
@@ -135,21 +127,53 @@ public class OrderService {
                 // Additional Details
                 .instructions(request.getAdditionalDetails() != null
                         ? request.getAdditionalDetails().getInstructions() : null)
-                // Image
-                .imageUrl(imageUrl)
+                // Image — set after DB save to avoid orphaned uploads on rollback
+                .imageUrl(null)
                 // Status — always starts at ORDER_CREATED with no stage
                 .currentStatus(OrderStatus.ORDER_CREATED)
                 .currentStage(null)
-                // Workflow (NEW)
+                // Workflow
                 .workflow(workflow)
                 // Audit
                 .createdBy(createdBy)
-                .createdAt(createdAtIST)  // ✅ Explicit IST
+                .createdAt(createdAtIST)
                 .build();
 
+        // 7. Save order to DB first — if this fails, no image is uploaded
         Order savedOrder = orderRepository.save(order);
 
-        // 7. Record first history entry
+        // 8. Image handling — two paths:
+        //    a) Doctor-placed order with pre-uploaded imageUrl → assign directly, no upload
+        //    b) Normal flow with multipart image file → upload to cloud storage
+        boolean doctorPlaced = Boolean.TRUE.equals(request.getOrderPlacedByDoctor());
+
+        if (doctorPlaced && request.getImageUrl() != null) {
+            log.info("Doctor-placed order: assigning pre-uploaded imageUrl for order: {}", request.getBarcodeId());
+            savedOrder.setImageUrl(request.getImageUrl());
+            savedOrder = orderRepository.save(savedOrder);
+        } else if (image != null && !image.isEmpty()) {
+            log.info("Uploading image for order: {}", request.getBarcodeId());
+            try {
+                String imageUrl = cloudStorageService.uploadImage(image);
+                savedOrder.setImageUrl(imageUrl);
+                savedOrder = orderRepository.save(savedOrder);
+            } catch (Exception e) {
+                log.error("Image upload failed for order {}. Rolling back DB record. Error: {}",
+                        request.getBarcodeId(), e.getMessage());
+                orderRepository.deleteById(savedOrder.getId());
+                throw new RuntimeException("Image upload failed: " + e.getMessage());
+            }
+        }
+
+        // 8b. If this order was converted from a DentistOrderRequest, delete that request
+        if (doctorPlaced && request.getDentistOrderRequestId() != null) {
+            dentistOrderRequestRepository.findById(request.getDentistOrderRequestId())
+                    .ifPresent(dentistOrderRequestRepository::delete);
+            log.info("Deleted DentistOrderRequest {} after converting to order",
+                    request.getDentistOrderRequestId());
+        }
+
+        // 9. Record first history entry
         recordHistory(savedOrder, createdBy,
                 null, null,
                 OrderStatus.ORDER_CREATED, null,

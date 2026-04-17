@@ -16,4 +16,5 @@ public class DentistLabResponse {
     private String pincode;
     private String mobileNumber;
     private String email;
+    private long orderCount;
 }

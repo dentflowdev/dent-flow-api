@@ -17,5 +17,5 @@ public class UserResponse {
     private String mobileNumber;
     private Set<String> roles;
     private LocalDateTime createdAt;
-    private String labId;
+    private Set<UUID> labIds;
 }

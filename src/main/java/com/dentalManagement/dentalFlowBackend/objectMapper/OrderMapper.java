@@ -60,6 +60,7 @@ public class OrderMapper {
                 .createdAt(order.getCreatedAt())
                 .deliveredAt(order.getDeliveredAt())
                 .isEdited(order.isEdited())
+                .orderPlacedByDoctor(order.getOrderPlacedByDoctor())
                 .build();
     }
 
