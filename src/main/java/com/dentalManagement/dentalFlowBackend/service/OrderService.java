@@ -8,6 +8,7 @@ import com.dentalManagement.dentalFlowBackend.dto.response.OrderListResponse;
 import com.dentalManagement.dentalFlowBackend.dto.response.OrderResponse;
 import com.dentalManagement.dentalFlowBackend.enums.OrderStatus;
 import com.dentalManagement.dentalFlowBackend.enums.RoleName;
+import com.dentalManagement.dentalFlowBackend.enums.SseEventType;
 import com.dentalManagement.dentalFlowBackend.exception.DuplicateBarcodeException;
 import com.dentalManagement.dentalFlowBackend.exception.InvalidTransitionException;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
@@ -41,6 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,6 +63,7 @@ public class OrderService {
     private final CloudStorageService cloudStorageService;
     private final LabWorkflowService labWorkflowService;
     private final GetAuthenticatedUser getAuthenticatedUser;
+    private final SseEventPublisher ssePublisher;
     // ─────────────────────────────────────────────────────────
     // CREATE ORDER (Marketing Executive)
     // Status  : ORDER_CREATED
@@ -165,12 +168,22 @@ public class OrderService {
             }
         }
 
-        // 8b. If this order was converted from a DentistOrderRequest, delete that request
+        // 8b. If this order was converted from a DentistOrderRequest, delete that request.
+        //     Fetch first to capture the doctor's userId for SSE, then delete.
+        UUID dentistRequestDoctorUserId = null;
         if (doctorPlaced && request.getDentistOrderRequestId() != null) {
-            dentistOrderRequestRepository.findById(request.getDentistOrderRequestId())
-                    .ifPresent(dentistOrderRequestRepository::delete);
-            log.info("Deleted DentistOrderRequest {} after converting to order",
-                    request.getDentistOrderRequestId());
+            Optional<DentistOrderRequest> dentistRequestOpt =
+                    dentistOrderRequestRepository.findById(request.getDentistOrderRequestId());
+            if (dentistRequestOpt.isPresent()) {
+                DentistOrderRequest dentistReq = dentistRequestOpt.get();
+                // Capture BEFORE delete so we can notify the doctor via SSE
+                if (dentistReq.getRequestedBy() != null) {
+                    dentistRequestDoctorUserId = dentistReq.getRequestedBy().getId();
+                }
+                dentistOrderRequestRepository.delete(dentistReq);
+                log.info("Deleted DentistOrderRequest {} after converting to order",
+                        request.getDentistOrderRequestId());
+            }
         }
 
         // 9. Record first history entry
@@ -183,7 +196,20 @@ public class OrderService {
                 savedOrder.getId(), savedOrder.getBarcodeId(),
                 workflow != null ? workflow.getWorkflowName() : "DEFAULT");
 
-        return orderMapper.toOrderResponse(savedOrder);
+        OrderResponse createdResponse = orderMapper.toOrderResponse(savedOrder);
+
+        // ── SSE: notify lab staff of new order ──────────────────
+        if (labId != null) {
+            ssePublisher.publishToLab(labId, SseEventType.ORDER_CREATED, createdResponse);
+        }
+        // ── SSE: notify the doctor whose request was just converted ──
+        if (dentistRequestDoctorUserId != null) {
+            ssePublisher.publishToUser(dentistRequestDoctorUserId,
+                    SseEventType.DENTIST_REQUEST_REMOVED,
+                    Map.of("requestId", request.getDentistOrderRequestId()));
+        }
+
+        return createdResponse;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -257,7 +283,20 @@ public class OrderService {
         log.info("Order {} stage updated to {}. Status: {} → {}",
                 orderId, request.getNewStage(), prevStatus, newStatus);
 
-        return orderMapper.toOrderResponse(updatedOrder);
+        OrderResponse stageResponse = orderMapper.toOrderResponse(updatedOrder);
+
+        // ── SSE: all lab staff ──
+        ssePublisher.publishToLab(technician.getPrimaryLab().getId(),
+                SseEventType.ORDER_STAGE_UPDATED, stageResponse);
+
+        // ── SSE: the order's doctor (only if they have a linked User account) ──
+        Doctor stageDoctor = updatedOrder.getDoctor();
+        if (stageDoctor != null && stageDoctor.getUser() != null) {
+            ssePublisher.publishToUser(stageDoctor.getUser().getId(),
+                    SseEventType.ORDER_STAGE_UPDATED, stageResponse);
+        }
+
+        return stageResponse;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -294,7 +333,20 @@ public class OrderService {
 
         log.info("Order {} delivered at {}", orderId, order.getDeliveredAt());
 
-        return orderMapper.toOrderResponse(updatedOrder);
+        OrderResponse deliveredResponse = orderMapper.toOrderResponse(updatedOrder);
+
+        // ── SSE: all lab staff ──
+        ssePublisher.publishToLab(deliveredBy.getPrimaryLab().getId(),
+                SseEventType.ORDER_DELIVERED, deliveredResponse);
+
+        // ── SSE: the order's doctor (only if linked to a User account) ──
+        Doctor deliverDoctor = updatedOrder.getDoctor();
+        if (deliverDoctor != null && deliverDoctor.getUser() != null) {
+            ssePublisher.publishToUser(deliverDoctor.getUser().getId(),
+                    SseEventType.ORDER_DELIVERED, deliveredResponse);
+        }
+
+        return deliveredResponse;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -433,12 +485,19 @@ public class OrderService {
         User currentUser = getAuthenticatedUser.execute();
         validateOrderBelongsToLab(order, currentUser.getPrimaryLab());
 
+        // Capture labId before deletion for SSE
+        UUID deleteLabId = currentUser.getPrimaryLab().getId();
+
         // Delete all history records for this order first (FK constraint)
         int deletedHistoryCount = orderHistoryRepository.deleteAllByOrderId(orderId);
         log.info("Deleted {} history record(s) for order: {}", deletedHistoryCount, orderId);
 
         orderRepository.deleteById(orderId);
         log.info("Order {} successfully deleted", orderId);
+
+        // ── SSE: lab staff see the order disappear ──
+        ssePublisher.publishToLab(deleteLabId, SseEventType.ORDER_DELETED,
+                Map.of("orderId", orderId));
     }
 
     // ─────────────────────────────────────────────────────────
@@ -582,7 +641,20 @@ public class OrderService {
 
         log.info("Order {} details updated. isEdited=true", orderId);
 
-        return orderMapper.toOrderResponse(updated);
+        OrderResponse updatedResponse = orderMapper.toOrderResponse(updated);
+
+        // ── SSE: all lab staff ──
+        ssePublisher.publishToLab(updatedBy.getPrimaryLab().getId(),
+                SseEventType.ORDER_UPDATED, updatedResponse);
+
+        // ── SSE: the order's doctor (only if linked to a User account) ──
+        Doctor updatedOrderDoctor = updated.getDoctor();
+        if (updatedOrderDoctor != null && updatedOrderDoctor.getUser() != null) {
+            ssePublisher.publishToUser(updatedOrderDoctor.getUser().getId(),
+                    SseEventType.ORDER_UPDATED, updatedResponse);
+        }
+
+        return updatedResponse;
     }
 
     // ─────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.dentalManagement.dentalFlowBackend.service;
 import com.dentalManagement.dentalFlowBackend.dto.request.AssignRoleRequest;
 import com.dentalManagement.dentalFlowBackend.dto.response.UserResponse;
 import com.dentalManagement.dentalFlowBackend.enums.RoleName;
+import com.dentalManagement.dentalFlowBackend.enums.SseEventType;
 import com.dentalManagement.dentalFlowBackend.exception.OperationNotPermittedException;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
 import com.dentalManagement.dentalFlowBackend.model.Lab;
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -35,7 +37,8 @@ public class AdminService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final RoleRepository roleRepository;
     private final LabRepository labRepository;
-    private final GetAuthenticatedUser getAuthenticatedUser;  // ← NEW: Inject to get current admin
+    private final GetAuthenticatedUser getAuthenticatedUser;
+    private final SseEventPublisher ssePublisher;
 
     /**
      * Get all active users belonging to the current admin's lab, excluding ROLE_DOCTOR users.
@@ -93,6 +96,10 @@ public class AdminService {
         user.setActive(false);
         userRepository.save(user);
         log.info("User {} has been deactivated", userId);
+
+        // ── SSE: tell the specific user their session is revoked ──
+        ssePublisher.publishToUser(userId, SseEventType.USER_DEACTIVATED,
+                Map.of("userId", userId));
     }
 
     /**
@@ -139,6 +146,10 @@ public class AdminService {
         }
 
         assertNotDoctor(user);
+
+        // Notify before delete so the emitter is still findable in the registry
+        ssePublisher.publishToUser(userId, SseEventType.USER_DELETED,
+                Map.of("userId", userId));
 
         refreshTokenRepository.deleteByUser(user);
         userRepository.deleteById(userId);
@@ -195,5 +206,9 @@ public class AdminService {
         userRepository.save(user);
 
         log.info("Role {} successfully assigned to user: {}", request.getRoleName(), userId);
+
+        // ── SSE: HIGH PRIORITY — user sees their new role instantly without re-login ──
+        ssePublisher.publishToUser(userId, SseEventType.ROLE_CHANGED,
+                Map.of("userId", userId, "newRole", request.getRoleName().name()));
     }
 }

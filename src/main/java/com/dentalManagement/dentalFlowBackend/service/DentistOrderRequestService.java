@@ -2,6 +2,7 @@ package com.dentalManagement.dentalFlowBackend.service;
 
 import com.dentalManagement.dentalFlowBackend.dto.request.CreateDentistOrderRequest;
 import com.dentalManagement.dentalFlowBackend.dto.response.DentistOrderRequestResponse;
+import com.dentalManagement.dentalFlowBackend.enums.SseEventType;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
 import com.dentalManagement.dentalFlowBackend.model.DentistOrderRequest;
 import com.dentalManagement.dentalFlowBackend.model.Doctor;
@@ -11,6 +12,8 @@ import com.dentalManagement.dentalFlowBackend.repository.DentistOrderRequestRepo
 import com.dentalManagement.dentalFlowBackend.repository.DoctorRepository;
 import com.dentalManagement.dentalFlowBackend.repository.LabRepository;
 import com.dentalManagement.dentalFlowBackend.util.GetAuthenticatedUser;
+
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,7 @@ public class DentistOrderRequestService {
     private final LabRepository labRepository;
     private final CloudStorageService cloudStorageService;
     private final GetAuthenticatedUser getAuthenticatedUser;
+    private final SseEventPublisher ssePublisher;
 
     // ─────────────────────────────────────────────────────────
     // CREATE — Doctor submits a partial order request to a lab
@@ -99,6 +103,10 @@ public class DentistOrderRequestService {
 
         log.info("Dentist order request created. ID: {}, Lab: {}", saved.getId(), lab.getName());
 
+        // ── SSE: lab staff see the new request instantly ──
+        ssePublisher.publishToLab(lab.getId(), SseEventType.DENTIST_REQUEST_RECEIVED,
+                toResponse(saved));
+
         return toResponse(saved);
     }
 
@@ -163,8 +171,16 @@ public class DentistOrderRequestService {
             throw new ResourceNotFoundException("Dentist order request not found: " + requestId);
         }
 
+        // Capture labId before deletion for SSE
+        UUID requestLabId = orderRequest.getLab().getId();
+
         dentistOrderRequestRepository.deleteById(requestId);
         log.info("Dentist order request {} deleted.", requestId);
+
+        // ── SSE: lab staff see the request disappear from their list ──
+        // (Doctor cancelled their own request — no need to notify them, they know)
+        ssePublisher.publishToLab(requestLabId, SseEventType.DENTIST_REQUEST_REMOVED,
+                Map.of("requestId", requestId));
     }
 
     // ─────────────────────────────────────────────────────────

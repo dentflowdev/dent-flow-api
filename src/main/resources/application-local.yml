@@ -6,7 +6,6 @@ spring:
     hikari:
       maximum-pool-size: 5
       minimum-idle: 1
-
       connection-timeout: 30000
 
   jpa:
@@ -17,6 +16,12 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Upstash Redis — paste your rediss:// URL here for local dev
+  # Format: rediss://default:<password>@<host>:<port>
+  data:
+    redis:
+      url: ${REDIS_URL}
 
 jwt:
   secret: ${JWT_SECRET}

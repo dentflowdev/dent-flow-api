@@ -23,6 +23,11 @@ spring:
         connection:
           provider_disables_autocommit: false
 
+  # Upstash Redis — set REDIS_URL env var in your prod deployment
+  data:
+    redis:
+      url: ${REDIS_URL}
+
 jwt:
   secret: ${JWT_SECRET}
 

@@ -7,6 +7,13 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+  # Redis (Upstash) — used for SSE Pub/Sub broadcasting only (not as a data store)
+  data:
+    redis:
+      url: ${REDIS_URL}
+      repositories:
+        enabled: false   # prevents Spring Data from scanning JPA repos as Redis repos
+
   # Mail Configuration (for OTP emails)
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
