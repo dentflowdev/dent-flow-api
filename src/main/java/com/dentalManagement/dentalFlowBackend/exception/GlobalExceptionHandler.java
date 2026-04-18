@@ -1,7 +1,9 @@
 package com.dentalManagement.dentalFlowBackend.exception;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -78,20 +80,33 @@ public class GlobalExceptionHandler {
     // ── Business logic errors (RuntimeException) ──
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(
-            RuntimeException ex) {
+            RuntimeException ex, HttpServletResponse response) {
+        resetIfSseResponse(response);
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
     }
 
     // ── Catch all other unexpected errors ──
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(
-            Exception ex) {
+            Exception ex, HttpServletResponse response) {
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
+        resetIfSseResponse(response);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Something went wrong. Please try again.", null);
     }
 
-    // ── Helper ──
+    // ── Helpers ──
+
+    // Resets response content-type when an exception bubbles up from an SSE request.
+    // Without this, Spring fails to write the JSON error body because the response
+    // is already locked to text/event-stream.
+    private void resetIfSseResponse(HttpServletResponse response) {
+        if (!response.isCommitted() &&
+                MediaType.TEXT_EVENT_STREAM_VALUE.equals(response.getContentType())) {
+            response.reset();
+        }
+    }
+
     private ResponseEntity<Map<String, Object>> buildResponse(
             HttpStatus status, String message, Object details) {
 
@@ -103,6 +118,8 @@ public class GlobalExceptionHandler {
         if (details != null) {
             body.put("details", details);
         }
-        return ResponseEntity.status(status).body(body);
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body);
     }
 }

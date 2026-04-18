@@ -45,6 +45,7 @@ public class RedisConfig {
 
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+        container.setRecoveryInterval(2000L);
 
         // Subscribe to ALL lab channels and ALL user channels in one shot
         container.addMessageListener(sseEventSubscriber, new PatternTopic("lab:*"));

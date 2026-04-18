@@ -47,10 +47,10 @@ public class SseController {
         User user = getAuthenticatedUser.execute();
         UUID userId = user.getId();
 
-        // 30 min server-side timeout. Prevents dead emitters accumulating in memory
-        // when clients disconnect abruptly (network drop, app killed) without
-        // triggering the onCompletion/onError callbacks. Client should reconnect on timeout.
-        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
+        // 55 min server-side timeout — just under Cloud Run's 60 min max request timeout.
+        // Ensures Spring cleans up the emitter before Cloud Run forcibly closes the connection.
+        // Client should reconnect on timeout.
+        SseEmitter emitter = new SseEmitter(55 * 60 * 1000L);
 
         boolean isDoctor = user.getRoles().stream()
                 .anyMatch(r -> r.getRoleName() == RoleName.ROLE_DOCTOR);
