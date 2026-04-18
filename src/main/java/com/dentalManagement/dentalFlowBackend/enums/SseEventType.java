@@ -10,9 +10,9 @@ public enum SseEventType {
     ORDER_DELETED,           // lab broadcast + doctor
 
     // ── Doctor mutations ───────────────────────────────────────
-    DOCTOR_ADDED,            // lab broadcast
-    DOCTOR_UPDATED,          // lab broadcast
-    DOCTOR_DELETED,          // lab broadcast
+    DOCTOR_ADDED,            // lab broadcast + doctor (if user linked)
+    DOCTOR_UPDATED,          // lab broadcast + doctor (if user linked)
+    DOCTOR_DELETED,          // lab broadcast + doctor (if user linked)
 
     // ── Dentist order requests ─────────────────────────────────
     DENTIST_REQUEST_RECEIVED, // lab broadcast

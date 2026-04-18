@@ -73,6 +73,10 @@ public class DoctorService {
         // ── SSE: lab staff see new doctor in the dropdown ──
         ssePublisher.publishToLab(currentLab.getId(), SseEventType.DOCTOR_ADDED,
                 Map.of("doctorId", saved.getId(), "doctorName", saved.getDoctorName()));
+        if (saved.getUser() != null) {
+            ssePublisher.publishToUser(saved.getUser().getId(), SseEventType.DOCTOR_ADDED,
+                    Map.of("doctorId", saved.getId(), "doctorName", saved.getDoctorName()));
+        }
 
         return DoctorResponse.from(saved);
     }
@@ -106,6 +110,10 @@ public class DoctorService {
         // ── SSE: lab staff see updated doctor info ──
         ssePublisher.publishToLab(updatedDoctor.getLab().getId(), SseEventType.DOCTOR_UPDATED,
                 Map.of("doctorId", updatedDoctor.getId(), "doctorName", updatedDoctor.getDoctorName()));
+        if (updatedDoctor.getUser() != null) {
+            ssePublisher.publishToUser(updatedDoctor.getUser().getId(), SseEventType.DOCTOR_UPDATED,
+                    Map.of("doctorId", updatedDoctor.getId(), "doctorName", updatedDoctor.getDoctorName()));
+        }
 
         return DoctorResponse.from(updatedDoctor);
     }
@@ -123,13 +131,18 @@ public class DoctorService {
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found: " + doctorId));
 
         UUID labId = doctor.getLab().getId();
+        UUID doctorUserId = doctor.getUser() != null ? doctor.getUser().getId() : null;
 
         doctorRepository.deleteById(doctorId);
         log.info("Doctor {} successfully deleted", doctorId);
 
-        // ── SSE: lab staff see doctor removed from dropdown ──
+        // ── SSE: lab staff and doctor see the record removed ──
         ssePublisher.publishToLab(labId, SseEventType.DOCTOR_DELETED,
                 Map.of("doctorId", doctorId));
+        if (doctorUserId != null) {
+            ssePublisher.publishToUser(doctorUserId, SseEventType.DOCTOR_DELETED,
+                    Map.of("doctorId", doctorId));
+        }
     }
 
     // ─────────────────────────────────────────────────────────
