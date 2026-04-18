@@ -6,6 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -60,6 +62,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleAccessDenied(
             AccessDeniedException ex) {
         return buildResponse(HttpStatus.FORBIDDEN, "Access denied", null);
+    }
+
+    // ── DB unavailable / cannot start transaction (wrong env, network, SSL, pool) ──
+    @ExceptionHandler({
+            CannotCreateTransactionException.class,
+            DataAccessResourceFailureException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleDatabaseUnavailable(Exception ex) {
+        log.error("Database unavailable (check DB_URL, credentials, SSL, firewall): {}", ex.getMessage(), ex);
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "Database temporarily unavailable. Please try again.", null);
     }
 
     // ── Business logic errors (RuntimeException) ──

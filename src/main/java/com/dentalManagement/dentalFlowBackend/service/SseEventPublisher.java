@@ -65,7 +65,7 @@ public class SseEventPublisher {
             SseEventPayload payload = new SseEventPayload(eventType.name(), data);
             String json = objectMapper.writeValueAsString(payload);
             redisTemplate.convertAndSend(channel, json);
-            log.debug("SSE published — channel: {}, event: {}", channel, eventType);
+            log.info("SSE published — channel: {}, event: {}", channel, eventType);
         } catch (Exception e) {
             // Never let SSE failures break the main API response
             log.error("SSE publish failed — channel: {}, event: {}, error: {}",

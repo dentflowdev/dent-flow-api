@@ -38,7 +38,7 @@ public class SseEventSubscriber implements MessageListener {
         String channel = new String(message.getChannel(), StandardCharsets.UTF_8);
         String body    = new String(message.getBody(),    StandardCharsets.UTF_8);
 
-        log.debug("SSE subscriber received message on channel: {}", channel);
+        log.info("SSE subscriber received message on channel: {}", channel);
 
         try {
             // Extract eventType from JSON without full deserialization

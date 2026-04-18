@@ -9,6 +9,7 @@ spring:
       connection-timeout: 30000
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update        # auto create/update tables locally
     show-sql: true

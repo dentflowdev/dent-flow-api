@@ -1,6 +1,7 @@
 package com.dentalManagement.dentalFlowBackend.service;
 
 import com.dentalManagement.dentalFlowBackend.dto.request.CreateDoctorRequest;
+import com.dentalManagement.dentalFlowBackend.dto.response.DoctorResponse;
 import com.dentalManagement.dentalFlowBackend.enums.RoleName;
 import com.dentalManagement.dentalFlowBackend.enums.SseEventType;
 import com.dentalManagement.dentalFlowBackend.exception.ResourceNotFoundException;
@@ -38,7 +39,7 @@ public class DoctorService {
     // and the user's labs are updated with this lab.
     // ─────────────────────────────────────────────────────────
     @Transactional
-    public Doctor createDoctor(CreateDoctorRequest request) {
+    public DoctorResponse createDoctor(CreateDoctorRequest request) {
 
         User currentAdmin = getAuthenticatedUser.execute();
         Lab currentLab = currentAdmin.getPrimaryLab();
@@ -73,7 +74,7 @@ public class DoctorService {
         ssePublisher.publishToLab(currentLab.getId(), SseEventType.DOCTOR_ADDED,
                 Map.of("doctorId", saved.getId(), "doctorName", saved.getDoctorName()));
 
-        return saved;
+        return DoctorResponse.from(saved);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ public class DoctorService {
     // ROLE_DOCTOR user, auto-link them.
     // ─────────────────────────────────────────────────────────
     @Transactional
-    public Doctor updateDoctor(UUID doctorId, CreateDoctorRequest request) {
+    public DoctorResponse updateDoctor(UUID doctorId, CreateDoctorRequest request) {
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + doctorId));
 
@@ -106,7 +107,7 @@ public class DoctorService {
         ssePublisher.publishToLab(updatedDoctor.getLab().getId(), SseEventType.DOCTOR_UPDATED,
                 Map.of("doctorId", updatedDoctor.getId(), "doctorName", updatedDoctor.getDoctorName()));
 
-        return updatedDoctor;
+        return DoctorResponse.from(updatedDoctor);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -135,14 +136,14 @@ public class DoctorService {
     // GET ALL DOCTORS — scoped to current user's lab
     // ─────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
-    public List<Doctor> getAllDoctors() {
+    public List<DoctorResponse> getAllDoctors() {
         User currentUser = getAuthenticatedUser.execute();
         Lab currentLab = currentUser.getPrimaryLab();
 
         log.info("Fetching doctors for lab: {}", currentLab.getId());
         List<Doctor> doctors = doctorRepository.findByLab(currentLab);
         log.info("Found {} doctor(s)", doctors.size());
-        return doctors;
+        return doctors.stream().map(DoctorResponse::from).toList();
     }
 
     // ─────────────────────────────────────────────────────────

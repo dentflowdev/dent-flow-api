@@ -3,7 +3,7 @@ package com.dentalManagement.dentalFlowBackend.controller;
 
 
 import com.dentalManagement.dentalFlowBackend.dto.request.CreateDoctorRequest;
-import com.dentalManagement.dentalFlowBackend.model.Doctor;
+import com.dentalManagement.dentalFlowBackend.dto.response.DoctorResponse;
 import com.dentalManagement.dentalFlowBackend.service.DoctorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class DoctorController {
     // ─────────────────────────────────────────────────────────
     @PostMapping("/add")
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
-    public ResponseEntity<Doctor> createDoctor(@RequestBody @Valid CreateDoctorRequest request) {
+    public ResponseEntity<DoctorResponse> createDoctor(@RequestBody @Valid CreateDoctorRequest request) {
 
         log.info("POST /api/v1/doctors — name: {}", request.getDoctorName());
         return ResponseEntity.status(HttpStatus.CREATED).body(doctorService.createDoctor(request));
@@ -43,7 +43,7 @@ public class DoctorController {
     // ─────────────────────────────────────────────────────────
     @PutMapping("/edit/{doctorId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
-    public ResponseEntity<Doctor> editDoctor(
+    public ResponseEntity<DoctorResponse> editDoctor(
             @PathVariable UUID doctorId,
             @RequestBody @Valid CreateDoctorRequest request) {
 
@@ -70,7 +70,7 @@ public class DoctorController {
     // ─────────────────────────────────────────────────────────
     @GetMapping("/getalldoctors")
     @PreAuthorize("hasAnyRole('ADMIN', 'MARKETING_EXECUTIVE', 'RECEPTIONIST', 'TECHNICIAN', 'DOCTOR')")
-    public ResponseEntity<List<Doctor>> getAllDoctors() {
+    public ResponseEntity<List<DoctorResponse>> getAllDoctors() {
 
         log.info("GET /api/v1/doctors");
         return ResponseEntity.ok(doctorService.getAllDoctors());

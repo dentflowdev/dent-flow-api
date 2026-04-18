@@ -199,14 +199,22 @@ public class OrderService {
         OrderResponse createdResponse = orderMapper.toOrderResponse(savedOrder);
 
         // ── SSE: notify lab staff of new order ──────────────────
+        log.info("SSE check — labId: {}", labId);
         if (labId != null) {
+            log.info("SSE publishing ORDER_CREATED to lab: {}", labId);
             ssePublisher.publishToLab(labId, SseEventType.ORDER_CREATED, createdResponse);
+            log.info("SSE ORDER_CREATED published to lab: {}", labId);
+        } else {
+            log.warn("SSE skipped ORDER_CREATED — labId is null for user: {}", createdBy.getId());
         }
         // ── SSE: notify the doctor whose request was just converted ──
+        log.info("SSE check — dentistRequestDoctorUserId: {}", dentistRequestDoctorUserId);
         if (dentistRequestDoctorUserId != null) {
+            log.info("SSE publishing DENTIST_REQUEST_REMOVED to user: {}", dentistRequestDoctorUserId);
             ssePublisher.publishToUser(dentistRequestDoctorUserId,
                     SseEventType.DENTIST_REQUEST_REMOVED,
                     Map.of("requestId", request.getDentistOrderRequestId()));
+            log.info("SSE DENTIST_REQUEST_REMOVED published to user: {}", dentistRequestDoctorUserId);
         }
 
         return createdResponse;

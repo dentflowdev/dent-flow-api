@@ -129,13 +129,16 @@ public class SseEmitterRegistry {
 
     private void sendToEmitter(UUID userId, String eventType, String rawJson) {
         SseEmitter emitter = emitters.get(userId);
-        if (emitter == null) return;
+        if (emitter == null) {
+            log.warn("SSE: no active emitter for user {} — event {} dropped", userId, eventType);
+            return;
+        }
 
         try {
             emitter.send(SseEmitter.event()
                     .name(eventType)
                     .data(rawJson, MediaType.APPLICATION_JSON));
-            log.debug("SSE: sent {} to user {}", eventType, userId);
+            log.info("SSE: sent {} to user {}", eventType, userId);
         } catch (IOException e) {
             log.warn("SSE: send failed for user {} ({}), removing connection", userId, e.getMessage());
             remove(userId);

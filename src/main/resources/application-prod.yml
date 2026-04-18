@@ -7,12 +7,14 @@ spring:
       maximum-pool-size: 5        # free tier has connection limits, keep this low
       minimum-idle: 1
       connection-timeout: 30000
-      idle-timeout: 300000        # reduce to 5 min (was 10) — drop idle before Supabase does
-      max-lifetime: 600000        # 10 min max connection lifetime
+      idle-timeout: 180000        # 3 min — drop idle before Supabase/PgBouncer does (5 min)
+      max-lifetime: 300000        # 5 min — recycle connections before PgBouncer kills them
       keepalive-time: 60000       # ping every 60s to keep connection alive
       connection-test-query: SELECT 1   # validate connection on borrow
+      leak-detection-threshold: 60000   # warn if connection held > 60s (detects stuck connections)
 
   jpa:
+    open-in-view: false       # prevents DB connection being held for entire SSE request duration
     hibernate:
       ddl-auto: validate      # never update in prod
     show-sql: false
