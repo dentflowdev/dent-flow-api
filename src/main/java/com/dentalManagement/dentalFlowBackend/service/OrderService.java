@@ -207,6 +207,11 @@ public class OrderService {
         } else {
             log.warn("SSE skipped ORDER_CREATED — labId is null for user: {}", createdBy.getId());
         }
+        // ── SSE: notify the order's doctor of ORDER_CREATED ──
+        if (savedOrder.getDoctor() != null && savedOrder.getDoctor().getUser() != null) {
+            UUID doctorUserId = savedOrder.getDoctor().getUser().getId();
+            ssePublisher.publishToUser(doctorUserId, SseEventType.ORDER_CREATED, createdResponse);
+        }
         // ── SSE: notify the doctor whose request was just converted ──
         log.info("SSE check — dentistRequestDoctorUserId: {}", dentistRequestDoctorUserId);
         if (dentistRequestDoctorUserId != null) {
@@ -493,8 +498,10 @@ public class OrderService {
         User currentUser = getAuthenticatedUser.execute();
         validateOrderBelongsToLab(order, currentUser.getPrimaryLab());
 
-        // Capture labId before deletion for SSE
+        // Capture labId and doctor userId before deletion for SSE
         UUID deleteLabId = currentUser.getPrimaryLab().getId();
+        UUID deleteDoctorUserId = (order.getDoctor() != null && order.getDoctor().getUser() != null)
+                ? order.getDoctor().getUser().getId() : null;
 
         // Delete all history records for this order first (FK constraint)
         int deletedHistoryCount = orderHistoryRepository.deleteAllByOrderId(orderId);
@@ -503,9 +510,13 @@ public class OrderService {
         orderRepository.deleteById(orderId);
         log.info("Order {} successfully deleted", orderId);
 
-        // ── SSE: lab staff see the order disappear ──
+        // ── SSE: notify lab staff and doctor of deletion ──
         ssePublisher.publishToLab(deleteLabId, SseEventType.ORDER_DELETED,
                 Map.of("orderId", orderId));
+        if (deleteDoctorUserId != null) {
+            ssePublisher.publishToUser(deleteDoctorUserId, SseEventType.ORDER_DELETED,
+                    Map.of("orderId", orderId));
+        }
     }
 
     // ─────────────────────────────────────────────────────────

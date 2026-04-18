@@ -3,11 +3,11 @@ package com.dentalManagement.dentalFlowBackend.enums;
 public enum SseEventType {
 
     // ── Order mutations ────────────────────────────────────────
-    ORDER_CREATED,           // lab broadcast
+    ORDER_CREATED,           // lab broadcast + doctor
     ORDER_STAGE_UPDATED,     // lab broadcast + doctor
     ORDER_DELIVERED,         // lab broadcast + doctor
     ORDER_UPDATED,           // lab broadcast + doctor
-    ORDER_DELETED,           // lab broadcast
+    ORDER_DELETED,           // lab broadcast + doctor
 
     // ── Doctor mutations ───────────────────────────────────────
     DOCTOR_ADDED,            // lab broadcast
